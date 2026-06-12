@@ -1,0 +1,19 @@
+{
+  "name": "ProClean",
+  "short_name": "ProClean",
+  "description": "Window cleaning business management",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0369a1",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    { "name": "Today's Jobs", "url": "/?page=jobs", "description": "View today's jobs" },
+    { "name": "Log Expense",  "url": "/?page=expenses", "description": "Log an expense" }
+  ]
+}
