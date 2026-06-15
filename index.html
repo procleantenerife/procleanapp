@@ -773,14 +773,18 @@ function renderMarketing(){
   if(currentUser.role!=="owner")return"<div class='empty'><i class='ti ti-lock'></i><p>Owner only</p></div>";
   var hasAnth=!!localStorage.getItem("mktAnthropicKey");
   var hasMeta=!!localStorage.getItem("mktMetaToken");
+  var hasPage=!!localStorage.getItem("mktPageId");
   var settingsHtml="<div class='card' style='margin-bottom:.85rem'>"
     +"<div class='card-hdr'><div class='card-title'>API settings</div></div>"
     +"<div class='settings-row'><div><div class='settings-lbl'>Anthropic API key</div><div class='settings-sub'>For AI post writing</div></div>"
     +"<div style='display:flex;align-items:center;gap:.4rem'>"+(hasAnth?"<span class='badge bg-green'>Set ✓</span>":"")
     +"<input type='password' id='mkt-anth' placeholder='sk-ant-...' style='width:100px;padding:.3rem .5rem;border:1.5px solid var(--bdr);border-radius:7px;font-size:.75rem' onchange=\"mktSaveKey('mktAnthropicKey',this.value)\"/></div></div>"
-    +"<div class='settings-row'><div><div class='settings-lbl'>Meta access token</div><div class='settings-sub'>For Ad Library</div></div>"
+    +"<div class='settings-row'><div><div class='settings-lbl'>Meta access token</div><div class='settings-sub'>Ad Library + posting</div></div>"
     +"<div style='display:flex;align-items:center;gap:.4rem'>"+(hasMeta?"<span class='badge bg-green'>Set ✓</span>":"")
     +"<input type='password' id='mkt-meta' placeholder='EAA...' style='width:100px;padding:.3rem .5rem;border:1.5px solid var(--bdr);border-radius:7px;font-size:.75rem' onchange=\"mktSaveKey('mktMetaToken',this.value)\"/></div></div>"
+    +"<div class='settings-row'><div><div class='settings-lbl'>Facebook Page ID</div><div class='settings-sub'>From /me/accounts in Graph Explorer</div></div>"
+    +"<div style='display:flex;align-items:center;gap:.4rem'>"+(hasPage?"<span class='badge bg-green'>Set ✓</span>":"")
+    +"<input type='text' id='mkt-pgid' placeholder='1234567890' inputmode='numeric' style='width:100px;padding:.3rem .5rem;border:1.5px solid var(--bdr);border-radius:7px;font-size:.75rem' onchange=\"mktSaveKey('mktPageId',this.value)\"/></div></div>"
     +"</div>";
   var tabBar="<div class='tabs2' style='margin-bottom:.85rem'>"
     +"<button class='tab2"+(mktTab==="generate"?" active":"")+"' onclick=\"mktTab='generate';render()\">Generate</button>"
@@ -834,13 +838,23 @@ function renderMarketing(){
       +"</div>"+adsContent;
   }
   if(mktTab==="drafts"){
+    var pageId=localStorage.getItem("mktPageId");
     if(!mktDrafts.length){content="<div class='empty'><i class='ti ti-file-text'></i><p>No drafts yet — generate posts first</p></div>";}
     else{content=mktDrafts.map(function(d,i){
       var col=d.platform==="Instagram"?"bg-purple":"bg-brand";
+      var postBtn="";
+      if(d.platform==="Facebook"&&pageId){
+        var statusStyle=d.posted?"color:var(--green);font-size:.72rem;font-weight:600":"";
+        postBtn=d.posted
+          ?"<span style='"+statusStyle+"'><i class='ti ti-circle-check'></i> Posted</span>"
+          :"<button class='btn-sm' style='background:var(--brand);color:#fff;border-color:var(--brand)' onclick='mktPostToFB("+i+")'>"
+            +"<i class='ti ti-send'></i> Post</button>";
+      }
       return "<div class='card' style='margin-bottom:.65rem'>"
         +"<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem'>"
         +"<span class='badge "+col+"'>"+d.platform+"</span>"
-        +"<div style='display:flex;gap:.35rem'>"
+        +"<div style='display:flex;gap:.35rem;align-items:center'>"
+        +postBtn
         +"<button class='btn-sm' onclick='mktCopy("+i+")'><i class='ti ti-copy'></i> Copy</button>"
         +"<button class='btn-del' onclick='mktDelDraft("+i+")'><i class='ti ti-trash' style='font-size:11px'></i></button>"
         +"</div></div>"
@@ -919,6 +933,39 @@ function mktCopy(i){
   else{var el=document.createElement("textarea");el.value=t;document.body.appendChild(el);el.select();document.execCommand("copy");document.body.removeChild(el);toast("Copied");}
 }
 function mktDelDraft(i){mktDrafts.splice(i,1);render();}
+function mktPostToFB(i){
+  var draft=mktDrafts[i];if(!draft)return;
+  var token=localStorage.getItem("mktMetaToken");
+  var pageId=localStorage.getItem("mktPageId");
+  if(!token){toast("Enter your Meta access token in Settings.");return;}
+  if(!pageId){toast("Enter your Facebook Page ID in Settings.");return;}
+  var img=mktImages[0]||null;
+  var endpoint=img
+    ?"https://graph.facebook.com/v21.0/"+pageId+"/photos"
+    :"https://graph.facebook.com/v21.0/"+pageId+"/feed";
+  var doPost=function(body,isForm){
+    return fetch(endpoint,{method:"POST",body:isForm?body:JSON.stringify(body),headers:isForm?{}:{"Content-Type":"application/json"}});
+  };
+  var go;
+  if(img){
+    var b64=img.data.split(",")[1];
+    var bytes=atob(b64);var ab=new ArrayBuffer(bytes.length);var ua=new Uint8Array(ab);
+    for(var k=0;k<bytes.length;k++)ua[k]=bytes.charCodeAt(k);
+    var blob=new Blob([ab],{type:img.mime});
+    var fd=new FormData();fd.append("message",draft.text);fd.append("source",blob,"photo.jpg");fd.append("access_token",token);
+    go=doPost(fd,true);
+  } else {
+    go=doPost({message:draft.text,access_token:token},false);
+  }
+  toast("Posting to Facebook...");
+  go.then(function(r){return r.json();})
+    .then(function(data){
+      if(data.error){toast("Error: "+data.error.message);return;}
+      mktDrafts[i].posted=true;render();
+      toast("Posted to Facebook!");
+    })
+    .catch(function(err){toast("Post failed: "+err.message);});
+}
 
 /* ── INIT ── */
 seedDemo();
