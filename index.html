@@ -276,7 +276,7 @@ var finSettings=J("pc_fin",{taxPct:20,taxBuffer:5,equipPct:10,payrollBuffer:100,
 var currentUser=null,currentPage="jobs",viewDate=td(),calViewDate=td(),calSelectedDate=td();
 var showAddJob=false,showAddExp=false,showAddBiz=false,showAddEvent=false,showAddTime=false,showAddCust=false,showFinSettings=false;
 var payPeriod="week",expTab="daily",jobAssignSel=[],routeResult=null,routeLoading=false;
-var mktLoading=false,mktGenerating=false,mktAdsData=[],mktDrafts=[],mktTab="generate",mktImages=[];
+var mktLoading=false,mktGenerating=false,mktAdsData=[],mktDrafts=[],mktTab="generate",mktImages=[],mktAnalysis=null,mktAnalysing=false;
 var finPeriod="month",finView="period",finYear=new Date().getFullYear(),finMonth=new Date().getMonth();
 var swReg=null,deferredInstall=null;
 
@@ -820,22 +820,45 @@ function renderMarketing(){
   }
   if(mktTab==="ads"){
     var adsContent="";
-    if(mktLoading){adsContent="<div class='ai-thinking'><div class='spinner'></div>Fetching competitor ads from Meta Ad Library...</div>";}
-    else if(!mktAdsData.length){adsContent="<div class='empty'><i class='ti ti-search'></i><p>Search to see what competitor window cleaners are running</p></div>";}
-    else{adsContent=mktAdsData.map(function(ad){
-      var body=(ad.ad_creative_bodies&&ad.ad_creative_bodies[0])||(ad.ad_creative_body||"");
-      var title=(ad.ad_creative_link_titles&&ad.ad_creative_link_titles[0])||(ad.ad_creative_link_title||"");
-      return "<div class='card' style='margin-bottom:.6rem'>"
-        +"<div style='font-size:.7rem;font-weight:700;color:var(--brand);margin-bottom:.3rem'>"+(ad.page_name||"Unknown")+"</div>"
-        +(title?"<div style='font-size:.82rem;font-weight:600;margin-bottom:.3rem'>"+title+"</div>":"")
-        +(body?"<div style='font-size:.78rem;color:var(--ink2);line-height:1.55'>"+body.slice(0,240)+(body.length>240?"...":"")+"</div>"
-              :"<div style='font-size:.73rem;color:var(--ink3);font-style:italic'>No ad copy returned — try fetching again</div>")
-        +"</div>";
-    }).join("");}
-    content="<div class='add-panel purple'><h3>Search Meta Ad Library</h3>"
+    if(mktLoading){adsContent="<div class='ai-thinking'><div class='spinner'></div>Pulling top 10 competitor ads from Meta Ad Library...</div>";}
+    else if(mktAnalysing){adsContent="<div class='ai-thinking'><div class='spinner'></div>Claude is comparing ads — analysing hooks, format, length, CTAs...</div>";}
+    else if(mktAnalysis){
+      var recs=mktAnalysis.recommendations||[];
+      var recsHtml=recs.length?"<div class='card' style='margin-bottom:.75rem;background:var(--teal-l);border-color:#99f6e4'>"
+        +"<div class='card-hdr'><div class='card-title' style='color:var(--teal-d)'><i class='ti ti-bulb' style='margin-right:4px'></i>5 recommendations for ProClean</div></div>"
+        +recs.map(function(r,i){return "<div style='display:flex;gap:.6rem;padding:.4rem 0;border-bottom:1px solid #99f6e4'>"
+          +"<div style='width:20px;height:20px;border-radius:50%;background:var(--teal);color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px'>"+(i+1)+"</div>"
+          +"<div style='font-size:.8rem;color:var(--teal-d);line-height:1.5'>"+r+"</div></div>";}).join("")
+        +"</div>":"";
+      var ads=mktAnalysis.analysis||[];
+      var hookColors={Problem:"bg-red",Proof:"bg-green",Offer:"bg-amber",Curiosity:"bg-purple",Local:"bg-teal",Story:"bg-brand"};
+      adsContent=recsHtml+ads.map(function(a,i){
+        var hc=hookColors[a.hook_type]||"bg-gray";
+        return "<div class='card' style='margin-bottom:.65rem'>"
+          +"<div style='display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem'>"
+          +"<div style='width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0'>"+(i+1)+"</div>"
+          +"<div style='flex:1;font-size:.82rem;font-weight:600;color:var(--ink)'>"+a.page+"</div>"
+          +"<span class='badge "+hc+"'>"+a.hook_type+"</span>"
+          +"</div>"
+          +"<div style='font-size:.78rem;color:var(--ink2);line-height:1.5;margin-bottom:.5rem;font-style:italic'>“"+a.hook+"”</div>"
+          +"<div style='display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.45rem'>"
+          +"<span class='badge bg-gray'><i class='ti ti-text-size' style='font-size:9px'></i> "+a.word_count+" words</span>"
+          +"<span class='badge bg-gray'><i class='ti ti-layout' style='font-size:9px'></i> "+a.format+"</span>"
+          +"<span class='badge bg-gray'><i class='ti ti-hand-click' style='font-size:9px'></i> "+a.cta+"</span>"
+          +"</div>"
+          +"<div style='font-size:.73rem;color:var(--green-d);background:var(--green-l);border-radius:6px;padding:.35rem .5rem'>"
+          +"<strong>Steal this:</strong> "+a.steal_this+"</div>"
+          +"</div>";
+      }).join("");
+    } else {
+      adsContent="<div class='empty'><i class='ti ti-chart-bar'></i><p>Fetch &amp; compare to see how your market is advertising</p></div>";
+    }
+    var searching=mktLoading||mktAnalysing;
+    content="<div class='add-panel purple'><h3>Compare competitor window cleaning ads</h3>"
       +"<div class='frow full'><div class='ff'><label>Search term</label>"
       +"<input id='mkt-q' value='window cleaning' placeholder='window cleaning'/></div></div>"
-      +(mktLoading?"":"<button class='btn-purple' onclick='mktFetchAds()'><i class='ti ti-search'></i> Fetch competitor ads</button>")
+      +(searching?"":"<button class='btn-purple' onclick='mktFetchAds()'><i class='ti ti-chart-dots-3'></i> Fetch &amp; compare top 10</button>")
+      +(mktAnalysis&&!searching?"<button class='btn-sm' style='margin-top:.5rem' onclick='mktAnalysis=null;mktAdsData=[];render()'>Clear &amp; search again</button>":"")
       +"</div>"+adsContent;
   }
   if(mktTab==="drafts"){
@@ -880,16 +903,57 @@ function mktFetchAds(){
   var token=localStorage.getItem("mktMetaToken");
   var q=(document.getElementById("mkt-q")||{value:"window cleaning"}).value||"window cleaning";
   if(!token){toast("Enter your Meta access token in Settings first.");return;}
-  mktLoading=true;mktAdsData=[];render();
+  var key=localStorage.getItem("mktAnthropicKey");
+  if(!key){toast("Enter your Anthropic API key in Settings first.");return;}
+  mktLoading=true;mktAdsData=[];mktAnalysis=null;render();
   fetch("https://graph.facebook.com/v21.0/ads_archive?search_terms="+encodeURIComponent(q)
-    +"&ad_type=ALL&fields=id,ad_creative_bodies,ad_creative_link_titles,page_name&limit=15"
+    +"&ad_type=ALL&fields=id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,page_name&limit=25"
     +"&access_token="+encodeURIComponent(token))
   .then(function(r){return r.json();})
   .then(function(data){
     if(data.error){toast("Meta: "+data.error.message);mktLoading=false;render();return;}
-    mktAdsData=data.data||[];mktLoading=false;render();toast(mktAdsData.length+" ads found");
+    var raw=(data.data||[]).filter(function(a){
+      return (a.ad_creative_bodies&&a.ad_creative_bodies[0])||(a.ad_creative_link_titles&&a.ad_creative_link_titles[0]);
+    }).slice(0,10);
+    mktAdsData=raw;mktLoading=false;
+    if(!raw.length){toast("No ads with copy found — try a broader term.");render();return;}
+    mktAnalyseAds(key,raw);
   })
   .catch(function(err){toast("Fetch failed: "+err.message);mktLoading=false;render();});
+}
+function mktAnalyseAds(key,ads){
+  mktAnalysing=true;render();
+  var adsList=ads.map(function(a,i){
+    var body=(a.ad_creative_bodies&&a.ad_creative_bodies[0])||"";
+    var title=(a.ad_creative_link_titles&&a.ad_creative_link_titles[0])||"";
+    var desc=(a.ad_creative_link_descriptions&&a.ad_creative_link_descriptions[0])||"";
+    return "Ad "+(i+1)+" — Page: "+(a.page_name||"Unknown")+"\n"
+      +(title?"Headline: "+title+"\n":"")
+      +(body?"Body: "+body+"\n":"")
+      +(desc?"Description: "+desc:"");
+  }).join("\n\n");
+  var sys="You are a direct-response marketing expert specialising in local service businesses. "
+    +"Analyse these "+ads.length+" window cleaning competitor ads and compare them to ProClean (window cleaning, Adeje Tenerife, friendly local brand targeting residential & commercial clients). "
+    +"For each ad identify: the opening hook verbatim, hook type (choose one: Problem/Proof/Offer/Curiosity/Local/Story), "
+    +"approximate word count of body copy, format (e.g. Short Text, Long Text, Text+Image, Carousel), CTA style, "
+    +"and one specific tactic ProClean should steal. "
+    +"Then give exactly 5 concrete recommendations for ProClean based on patterns you see working across these ads. "
+    +"Return ONLY valid JSON, no markdown:\n"
+    +'{"analysis":[{"rank":1,"page":"...","hook":"...","hook_type":"...","word_count":0,"format":"...","cta":"...","steal_this":"..."}],"recommendations":["...","...","...","...","..."]}';
+  fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2500,system:sys,messages:[{role:"user",content:"Here are the "+ads.length+" competitor ads to analyse:\n\n"+adsList}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error){toast("Analysis error: "+data.error.message);mktAnalysing=false;render();return;}
+    var txt=((data.content||[]).find(function(b){return b.type==="text";})||{text:"{}"}).text;
+    mktAnalysis=JSON.parse(txt.replace(/```json|```/g,"").trim());
+    mktAnalysing=false;render();
+    toast("Analysis complete — "+((mktAnalysis.analysis||[]).length)+" ads compared");
+  })
+  .catch(function(err){toast("Analysis failed: "+err.message);mktAnalysing=false;render();});
 }
 function mktGeneratePosts(){
   var key=localStorage.getItem("mktAnthropicKey");
