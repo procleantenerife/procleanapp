@@ -399,6 +399,7 @@ function startApp(){
   if(swReg&&Notification.permission==="default")document.getElementById("notif-banner").style.display="flex";
   if(Notification.permission==="granted")document.getElementById("bell-btn").style.display="flex";
   viewDate=td();calSelectedDate=td();calViewDate=td();
+  if(!localStorage.getItem("mktPageId"))localStorage.setItem("mktPageId","114127971781733");
   showPage("jobs");
 }
 function buildNav(){
