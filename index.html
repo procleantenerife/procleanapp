@@ -352,16 +352,16 @@ function biometricLogin(){
 /* ── SEED ── */
 function seedDemo(){
   if(users.length>0)return;
-  users=[{id:"u1",name:"Alex (Owner)",role:"owner",pin:"1234"},{id:"u2",name:"Jamie",role:"employee",pin:"0000"},{id:"u3",name:"Sam",role:"employee",pin:"1111"}];
-  hourlyRates={u2:12.5,u3:13};
+  users=[{id:"u1",name:"Todd (Owner)",role:"owner",pin:"1234"},{id:"u2",name:"Chris",role:"employee",pin:"0000"}];
+  hourlyRates={u2:12.5};
   customers=[{id:"c1",name:"Mrs. Patterson",address:"14 Harbour Rd, Adeje",phone:"622 111 000",type:"Residential",notes:"Front & rear, fortnightly"},{id:"c2",name:"Sunrise Office Park",address:"Calle Sol 4, Adeje",phone:"922 333 444",type:"Commercial",notes:"4th floor exterior"},{id:"c3",name:"Mr. Garcia",address:"22 Palm Court, Costa Adeje",phone:"622 555 666",type:"Residential",notes:"Ground floor only"},{id:"c4",name:"Blue Ocean Hotel",address:"Av. Litoral 88, Costa Adeje",phone:"922 777 888",type:"Commercial",notes:"Pool level + lobby"}];
   var t=td();
-  jobs=[{id:"j1",date:t,customerId:"c1",address:"14 Harbour Rd",type:"Residential",assignedTo:["u1","u2"],amount:65,done:false,notes:"Front + rear"},{id:"j2",date:t,customerId:"c2",address:"Sunrise Office Park",type:"Commercial",assignedTo:["u1"],amount:200,done:true,notes:"4th floor"},{id:"j3",date:t,customerId:"c3",address:"22 Palm Court",type:"Residential",assignedTo:["u3"],amount:45,done:false,notes:""},{id:"j4",date:t,customerId:"c4",address:"Blue Ocean Hotel",type:"Commercial",assignedTo:["u2","u3"],amount:180,done:false,notes:"Pool + lobby"}];
+  jobs=[{id:"j1",date:t,customerId:"c1",address:"14 Harbour Rd",type:"Residential",assignedTo:["u1","u2"],amount:65,done:false,notes:"Front + rear"},{id:"j2",date:t,customerId:"c2",address:"Sunrise Office Park",type:"Commercial",assignedTo:["u1"],amount:200,done:true,notes:"4th floor"},{id:"j3",date:t,customerId:"c3",address:"22 Palm Court",type:"Residential",assignedTo:["u2"],amount:45,done:false,notes:""},{id:"j4",date:t,customerId:"c4",address:"Blue Ocean Hotel",type:"Commercial",assignedTo:["u2"],amount:180,done:false,notes:"Pool + lobby"}];
   expenses=[{id:"e1",date:t,description:"Squeegees x4",category:"Equipment",amount:32,submittedBy:"u2"},{id:"e2",date:t,description:"Diesel",category:"Vehicle",amount:58,submittedBy:"u1"}];
-  bizBills=[{id:"b1",description:"Van insurance",category:"Insurance",amount:120,recurring:true,recurFreq:"monthly",recurDay:1},{id:"b2",description:"Social security - Jamie",category:"Social Security",amount:280,recurring:true,recurFreq:"monthly",recurDay:28},{id:"b3",description:"Social security - Sam",category:"Social Security",amount:265,recurring:true,recurFreq:"monthly",recurDay:28}];
-  events=[{id:"ev1",date:t,title:"Team morning briefing",time:"07:30",type:"Team",assignedTo:["u1","u2","u3"],notes:"Meet at depot"}];
+  bizBills=[{id:"b1",description:"Van insurance",category:"Insurance",amount:120,recurring:true,recurFreq:"monthly",recurDay:1},{id:"b2",description:"Social security - Chris",category:"Social Security",amount:280,recurring:true,recurFreq:"monthly",recurDay:28}];
+  events=[{id:"ev1",date:t,title:"Team morning briefing",time:"07:30",type:"Team",assignedTo:["u1","u2"],notes:"Meet at depot"}];
   var ci=new Date();ci.setHours(8,0,0,0);var co=new Date();co.setHours(16,30,0,0);
-  timesheets=[{id:"ts1",userId:"u2",date:t,clockIn:ci.toISOString(),clockOut:co.toISOString(),hours:8.5},{id:"ts2",userId:"u3",date:t,clockIn:ci.toISOString(),clockOut:null,hours:null}];
+  timesheets=[{id:"ts1",userId:"u2",date:t,clockIn:ci.toISOString(),clockOut:co.toISOString(),hours:8.5}];
   save();
 }
 
