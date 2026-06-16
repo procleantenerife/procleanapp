@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import db from './db.js';
 import { searchCustomerEvents, formatEventTime } from './calendar.js';
+import { notifyOwner } from './owner.js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -110,6 +111,10 @@ async function executeTool(name, input) {
       db.prepare(
         `INSERT INTO messages (customer_phone, direction, body) VALUES (?, 'out', ?)`
       ).run(input.phone, `[🚩 NEEDS OWNER FOLLOW-UP: ${input.reason}]`);
+      // Fire-and-forget — don't block the agent response
+      notifyOwner(input.phone, input.reason).catch(err =>
+        console.error('[owner notify error]', err.message)
+      );
       return 'Flagged for owner.';
     }
 

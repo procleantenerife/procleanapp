@@ -1,6 +1,7 @@
 import axios from 'axios';
 import db from './db.js';
 import { runAgent } from './agent.js';
+import { isOwner, handleOwnerMessage, isInHumanMode, notifyOwner } from './owner.js';
 
 const GRAPH_URL = 'https://graph.facebook.com/v20.0';
 
@@ -33,10 +34,24 @@ export async function handleInbound(req, res) {
 
     console.log(`[WA IN] ${from}: ${body}`);
 
+    // ── Owner messages — parse commands or relay to customer ──
+    if (isOwner(from)) {
+      await handleOwnerMessage(body);
+      continue;
+    }
+
+    // ── Log the inbound customer message ──
     db.prepare(
       `INSERT INTO messages (customer_phone, direction, body) VALUES (?, 'in', ?)`
     ).run(from, body);
 
+    // ── Human mode — forward to owner, skip agent ──
+    if (isInHumanMode(from)) {
+      await forwardToOwner(from, body);
+      continue;
+    }
+
+    // ── Bot mode — run agent ──
     try {
       const reply = await runAgent(from, body);
       if (reply) await sendText(from, reply);
@@ -44,10 +59,27 @@ export async function handleInbound(req, res) {
       console.error('[agent error]', err.message);
       await sendText(
         from,
-        "Sorry, I'm having a technical issue right now. Please try again in a moment or call us directly."
+        "Sorry, I'm having a technical issue right now. The owner has been notified and will be in touch shortly."
       );
+      await notifyOwner(from, `Agent crashed: ${err.message}`);
     }
   }
+}
+
+// ── Forward a customer message to the owner ────────────────────────────────
+async function forwardToOwner(customerPhone, body) {
+  const ownerPhone = (process.env.OWNER_PHONE || '').replace(/\D/g, '');
+  if (!ownerPhone) return;
+
+  const customer = db.prepare(
+    'SELECT name FROM customers WHERE phone = ?'
+  ).get(customerPhone);
+  const name = customer?.name || `+${customerPhone}`;
+
+  await sendText(
+    ownerPhone,
+    `💬 *${name}* (+${customerPhone}):\n${body}\n\nReply: ${customerPhone}: your message`
+  );
 }
 
 // ── Outbound helpers ────────────────────────────────────────────────────────
@@ -57,7 +89,7 @@ export async function sendText(to, body) {
   db.prepare(
     `INSERT INTO messages (customer_phone, direction, body) VALUES (?, 'out', ?)`
   ).run(to, body);
-  console.log(`[WA OUT] ${to}: ${body.substring(0, 80)}...`);
+  console.log(`[WA OUT] ${to}: ${body.substring(0, 80)}`);
 }
 
 /**

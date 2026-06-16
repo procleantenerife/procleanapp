@@ -37,6 +37,12 @@ export function initDB() {
       sent_at          TEXT DEFAULT (datetime('now')),
       UNIQUE(calendar_event_id, reminder_type)
     );
+
+    CREATE TABLE IF NOT EXISTS conversation_states (
+      customer_phone TEXT PRIMARY KEY,
+      mode           TEXT DEFAULT 'bot' CHECK(mode IN ('bot','human')),
+      updated_at     TEXT DEFAULT (datetime('now'))
+    );
   `);
   console.log('Database initialised:', dbPath);
 }
