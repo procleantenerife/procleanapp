@@ -59,7 +59,7 @@ export async function handleInbound(req, res) {
       console.error('[agent error]', err.message);
       await sendText(
         from,
-        "Sorry, I'm having a technical issue right now. The owner has been notified and will be in touch shortly."
+        "Sorry, something's gone a bit wrong on my end 😅 Give me a shout in a bit and I'll get back to you"
       );
       await notifyOwner(from, `Agent crashed: ${err.message}`);
     }
