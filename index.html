@@ -273,7 +273,7 @@ var users=J("pc_users",[]),jobs=J("pc_jobs",[]),expenses=J("pc_expenses",[]);
 var bizBills=J("pc_biz",[]),events=J("pc_events",[]),timesheets=J("pc_ts",[]);
 var hourlyRates=J("pc_rates",{}),customers=J("pc_customers",[]),biometricUsers=J("pc_bio",{});
 var finSettings=J("pc_fin",{taxPct:20,taxBuffer:5,equipPct:10,payrollBuffer:100,minSalary:2000,personalPct:25});
-var currentUser=null,currentPage="jobs",viewDate=td(),calViewDate=td(),calSelectedDate=td();
+var currentUser=null,currentPage="jobs",viewDate=td(),calViewDate=td(),calSelectedDate=td(),calView="week",calEmployee="all";
 var showAddJob=false,showAddExp=false,showAddBiz=false,showAddEvent=false,showAddTime=false,showAddCust=false,showFinSettings=false;
 var payPeriod="week",expTab="daily",jobAssignSel=[],routeResult=null,routeLoading=false;
 var mktLoading=false,mktGenerating=false,mktAdsData=[],mktDrafts=[],mktTab="generate",mktImages=[],mktAnalysis=null,mktAnalysing=false;
@@ -429,6 +429,7 @@ function renderJobs(){
       +"<div class='frow'><div class='ff'><label>Type</label><select id='j-type'><option>Residential</option><option>Commercial</option><option>Industrial</option></select></div><div class='ff'><label>Amount</label><input id='j-amt' type='number' placeholder='0.00' min='0' step='0.01' inputmode='decimal'/></div></div>"
       +"<div class='ff' style='margin-bottom:.55rem'><label>Assign to</label><div class='assign-grid'><span class='assign-pill team-all' onclick='assignAll()'>All team</span>"
       +users.map(function(u){return "<span class='assign-pill"+(jobAssignSel.indexOf(u.id)>=0?" selected":"")+"' onclick='pcToggleAssign(this)' data-p='"+ u.id +"' id='pill-"+u.id+"'>"+u.name.split(" ")[0]+"</span>";}).join("")+"</div></div>"
+      +"<div class='frow'><div class='ff'><label>Start time</label><input id='j-start' type='time'/></div><div class='ff'><label>End time</label><input id='j-end' type='time'/></div></div>"
       +"<div class='frow full'><div class='ff'><label>Notes</label><input id='j-notes' placeholder='Optional'/></div></div>"
       +"<div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='addJob()'><i class='ti ti-plus'></i> Add</button><button class='btn-sm' onclick='showAddJob=false;render()'>Cancel</button></div></div>";
   }
@@ -451,7 +452,8 @@ function addJob(){
   else if(custId)address=caddr(custId)||"";
   if(!address){alert("Select a customer or enter an address.");return;}
   if(jobAssignSel.length===0){alert("Assign to at least one person.");return;}
-  var j={id:"j"+Date.now(),date:viewDate,customerId:custId!=="custom"?custId:null,address:address,type:document.getElementById("j-type").value,assignedTo:jobAssignSel.slice(),amount:parseFloat(document.getElementById("j-amt").value)||0,done:false,notes:document.getElementById("j-notes").value.trim()};
+  var jst=document.getElementById("j-start").value,jet=document.getElementById("j-end").value;
+  var j={id:"j"+Date.now(),date:viewDate,customerId:custId!=="custom"?custId:null,address:address,type:document.getElementById("j-type").value,assignedTo:jobAssignSel.slice(),amount:parseFloat(document.getElementById("j-amt").value)||0,done:false,notes:document.getElementById("j-notes").value.trim(),startTime:jst||null,endTime:jet||null};
   jobs.push(j);save();showAddJob=false;jobAssignSel=[];render();notifyNewJob(j);
 }
 function toggleJob(id){var j=jobs.find(function(j){return j.id===id;});if(j){j.done=!j.done;save();render();if(j.done)toast("Job marked complete");}}
@@ -510,24 +512,98 @@ function runRoute(){
 /* ── CALENDAR ── */
 function renderCalendar(){
   var isOwner=currentUser.role==="owner";
-  var cv=new Date(calViewDate+"T12:00:00"),yr=cv.getFullYear(),mo=cv.getMonth();
-  var offset=(new Date(yr,mo,1).getDay()+6)%7,dim=new Date(yr,mo+1,0).getDate(),t=td();
-  var monthLabel=cv.toLocaleDateString("en-GB",{month:"long",year:"numeric"});
-  var grid="<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem'><button class='btn-sm' onclick='calPrev()'><i class='ti ti-chevron-left'></i></button><span style='font-family:var(--font-head);font-size:.92rem'>"+monthLabel+"</span><button class='btn-sm' onclick='calNext()'><i class='ti ti-chevron-right'></i></button></div><div class='cal-grid'>"+["M","T","W","T","F","S","S"].map(function(d){return "<div class='cal-hdr'>"+d+"</div>";}).join("");
-  for(var i=0;i<offset;i++)grid+="<div class='cal-day other-month'></div>";
-  for(var d=1;d<=dim;d++){var ds=yr+"-"+String(mo+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");var dj=isOwner?jobs.filter(function(j){return j.date===ds;}):jobs.filter(function(j){return j.date===ds&&j.assignedTo.indexOf(currentUser.id)>=0;});var de=isOwner?events.filter(function(e){return e.date===ds;}):events.filter(function(e){return e.date===ds&&e.assignedTo.indexOf(currentUser.id)>=0;});var dots=(dj.length?"<span class='dot' style='background:var(--brand)'></span>":"")+(de.length?"<span class='dot' style='background:var(--green)'></span>":"");var cls="cal-day"+(ds===t&&ds!==calSelectedDate?" today":"")+(ds===calSelectedDate?" selected":"");grid+="<div class='"+cls+"' onclick='pcCalDay(this)' data-p='"+ ds +"'>"+(ds===calSelectedDate||ds===t?"<strong>"+d+"</strong>":d)+(dots?"<div class='dot-row'>"+dots+"</div>":"")+"</div>";}
-  grid+="</div>";
-  var sj=isOwner?jobs.filter(function(j){return j.date===calSelectedDate;}):jobs.filter(function(j){return j.date===calSelectedDate&&j.assignedTo.indexOf(currentUser.id)>=0;});
-  var se=isOwner?events.filter(function(e){return e.date===calSelectedDate;}):events.filter(function(e){return e.date===calSelectedDate&&e.assignedTo.indexOf(currentUser.id)>=0;});
-  var addEvForm="";
-  if(showAddEvent&&isOwner){addEvForm="<div class='add-panel'><h3>New event</h3><div class='frow full'><div class='ff'><label>Title</label><input id='ev-title' placeholder='Event title'/></div></div><div class='frow'><div class='ff'><label>Time</label><input id='ev-time' type='time' value='09:00'/></div><div class='ff'><label>Type</label><select id='ev-type'><option>Team</option><option>Quote</option><option>Training</option><option>Admin</option></select></div></div><div class='frow full'><div class='ff'><label>Assign to</label><select id='ev-assign' multiple style='height:60px;font-size:.8rem'>"+users.map(function(u){return "<option value='"+u.id+"' selected>"+u.name+"</option>";}).join("")+"</select></div></div><div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='addEvent()'>Save</button><button class='btn-sm' onclick='showAddEvent=false;render()'>Cancel</button></div></div>";}
-  var tColors={Team:"bg-brand",Quote:"bg-amber",Training:"bg-teal",Admin:"bg-gray"};
-  var evList=(se.length+sj.length)===0?"<div class='empty' style='padding:1rem'><i class='ti ti-calendar-event'></i><p>Nothing on "+fmtDate(calSelectedDate)+"</p></div>":[].concat(se.map(function(e){return "<div class='item-row' style='padding:.6rem 0'><div style='width:9px;height:9px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:5px'></div><div class='item-info'><div class='item-title'>"+e.title+(e.time?" <span style='font-size:.7rem;color:var(--ink3)'>"+e.time+"</span>":"")+"</div><div class='item-sub'><span class='badge "+(tColors[e.type]||"bg-gray")+"'>"+e.type+"</span><span>"+e.assignedTo.map(uname).join(", ")+"</span></div></div>"+(isOwner?"<button class='btn-del' onclick='pcDelEvent(this)' data-p='"+ e.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button>":"")+"</div>";}),sj.map(function(j){return "<div class='item-row' style='padding:.6rem 0'><div style='width:9px;height:9px;border-radius:50%;background:var(--brand);flex-shrink:0;margin-top:5px'></div><div class='item-info'><div class='item-title'>"+j.address+"</div><div class='item-sub'><span class='badge bg-brand'>"+j.type+"</span><span>"+j.assignedTo.map(uname).join(", ")+"</span><span>"+fc(j.amount)+"</span></div></div><span class='badge "+(j.done?"bg-green":"bg-amber")+"'>"+(j.done?"Done":"Pending")+"</span></div>";})).join("");
-  return grid+"<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem'><span style='font-family:var(--font-head);font-size:.8rem;color:var(--ink2)'>"+fmtDate(calSelectedDate)+"</span>"+(isOwner?"<button class='btn-add' style='padding:.3rem .6rem;font-size:.72rem' onclick='showAddEvent=!showAddEvent;render()'><i class='ti ti-plus'></i></button>":"")+"</div>"+addEvForm+"<div class='card' style='padding:.75rem'>"+evList+"</div>";
+  if(!isOwner)calEmployee=currentUser.id;
+  var today=td(),SH=7,EH=19,ROWH=52,gridH=(EH-SH)*ROWH;
+  var ws=wkStart(calViewDate),days=[];
+  for(var _i=0;_i<7;_i++){var _dd=new Date(ws+"T12:00:00");_dd.setDate(_dd.getDate()+_i);days.push(_dd.toISOString().slice(0,10));}
+  var empOpts=isOwner?[{id:"all",name:"All"}].concat(users.map(function(u){return{id:u.id,name:u.name.split(" ")[0]};})):[{id:currentUser.id,name:currentUser.name.split(" ")[0]}];
+  var empSel=empOpts.map(function(u){return "<button class='ptab"+(calEmployee===u.id?" active":"")+"' onclick='pcCalEmp(this)' data-v='"+u.id+"'>"+u.name+"</button>";}).join("");
+  function fj(date){var r=jobs.filter(function(j){return j.date===date;});return calEmployee==="all"?r:r.filter(function(j){return j.assignedTo.indexOf(calEmployee)>=0;});}
+  function fe(date){var r=events.filter(function(e){return e.date===date;});return calEmployee==="all"?r:r.filter(function(e){return e.assignedTo.indexOf(calEmployee)>=0;});}
+  function ty(t){if(!t)return -1;var p=t.split(":");return(parseInt(p[0])-SH+parseInt(p[1]||0)/60)*ROWH;}
+  function tdur(t1,t2){if(!t1||!t2)return 1;var p1=t1.split(":"),p2=t2.split(":");return Math.max(0.3,(parseInt(p2[0])-parseInt(p1[0]))+(parseInt(p2[1]||0)-parseInt(p1[1]||0))/60);}
+  var EC=["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6"];
+  function jcol(j){if(j.done)return"#9ca3af";var idx=users.findIndex(function(u){return u.id===(j.assignedTo&&j.assignedTo[0]);});return EC[Math.max(0,idx)%EC.length];}
+  function hgrid(isNow){
+    var s="";
+    for(var _h=SH;_h<=EH;_h++){
+      s+="<div style='position:absolute;left:0;right:0;top:"+((_h-SH)*ROWH)+"px;border-top:1px solid var(--bdr);pointer-events:none'></div>";
+      if(_h<EH)s+="<div style='position:absolute;left:0;right:0;top:"+((_h-SH)*ROWH+ROWH/2)+"px;border-top:1px dashed rgba(0,0,0,.06);pointer-events:none'></div>";
+    }
+    if(isNow){var _n=new Date();var _cy=(_n.getHours()-SH+_n.getMinutes()/60)*ROWH;if(_cy>=0&&_cy<=gridH){s+="<div style='position:absolute;left:0;right:0;top:"+_cy+"px;border-top:2px solid var(--red);z-index:3;pointer-events:none'><div style='width:8px;height:8px;border-radius:50%;background:var(--red);position:absolute;left:-4px;top:-5px'></div></div>";}}
+    return s;
+  }
+  var tlbls="";
+  for(var _h=SH;_h<=EH;_h++){var _lbl=(_h<12?_h:(_h===12?12:_h-12))+":00"+(_h<12?" AM":" PM");tlbls+="<div style='position:absolute;top:"+((_h-SH)*ROWH-7)+"px;right:4px;font-size:.56rem;color:var(--muted);white-space:nowrap'>"+_lbl+"</div>";}
+  var wLabel=new Date(days[0]+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"})+" – "+new Date(days[6]+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+  var dLabel=new Date(calViewDate+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+  var nav="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem'>"
+    +"<button class='btn-sm' onclick='calGcPrev()'><i class='ti ti-chevron-left'></i></button>"
+    +"<div style='text-align:center'><div style='font-family:var(--font-head);font-size:.82rem'>"+(calView==="week"?wLabel:dLabel)+"</div>"
+    +"<button class='btn-sm' onclick='calGcToday()' style='font-size:.6rem;padding:.1rem .5rem;margin-top:.2rem'>Today</button></div>"
+    +"<button class='btn-sm' onclick='calGcNext()'><i class='ti ti-chevron-right'></i></button>"
+    +"</div>";
+  var tabs="<div style='display:flex;gap:.4rem;margin-bottom:.55rem;align-items:center'>"
+    +(isOwner?"<button class='ptab"+(calView==="week"?" active":"")+"' onclick='pcSetCalView(this)' data-v='week'>Week</button>":"")
+    +"<button class='ptab"+(calView==="day"?" active":"")+"' onclick='pcSetCalView(this)' data-v='day'>Day</button>"
+    +"<div style='flex:1'></div>"+empSel+"</div>";
+  if(calView==="day"){
+    var _dj=fj(calViewDate),_de=fe(calViewDate);
+    var _sched=_dj.filter(function(j){return j.startTime;}),_unsched=_dj.filter(function(j){return !j.startTime;});
+    var _evS=_de.filter(function(e){return e.time;}),_evU=_de.filter(function(e){return !e.time;});
+    var _allDay="";
+    if(_unsched.length||_evU.length){
+      _allDay="<div style='border:1px solid var(--bdr);border-radius:10px;padding:.4rem .65rem;margin-bottom:.5rem'>"
+        +"<div style='font-size:.6rem;text-transform:uppercase;color:var(--muted);letter-spacing:.04em;margin-bottom:.3rem'>All day / Unscheduled</div>"
+        +_unsched.map(function(j){return "<div style='display:flex;align-items:center;gap:.5rem;padding:.2rem 0'><div style='width:8px;height:8px;border-radius:2px;flex-shrink:0;background:"+jcol(j)+"'></div><div style='font-size:.75rem;font-weight:600'>"+j.address.split(",")[0]+"</div><div style='margin-left:auto;font-size:.7rem;color:var(--muted)'>"+fc(j.amount)+(j.done?" · Done":"")+"</div></div>";}).join("")
+        +_evU.map(function(e){return "<div style='font-size:.75rem;color:#8b5cf6;padding:.2rem 0'>"+e.title+"</div>";}).join("")
+        +"</div>";
+    }
+    var _dBlocks=_sched.map(function(j){
+      var _y=ty(j.startTime);if(_y<0)return"";
+      var _dur=tdur(j.startTime,j.endTime),_hp=Math.max(_dur*ROWH,30);
+      var _an=j.assignedTo.map(function(uid){var u=users.find(function(u){return u.id===uid;});return u?u.name.split(" ")[0]:"";}).join(", ");
+      return "<div style='position:absolute;top:"+_y+"px;height:"+_hp+"px;left:2px;right:2px;background:"+jcol(j)+";border-radius:6px;padding:4px 7px;overflow:hidden;cursor:pointer;z-index:2' onclick='pcCalJob(this)' data-id='"+j.id+"'>"
+        +"<div style='font-size:.72rem;font-weight:700;color:#fff;line-height:1.3'>"+j.address.split(",")[0]+"</div>"
+        +"<div style='font-size:.62rem;color:rgba(255,255,255,.9)'>"+j.startTime+(j.endTime?" – "+j.endTime:"")+" · "+fc(j.amount)+"</div>"
+        +(_hp>48?"<div style='font-size:.58rem;color:rgba(255,255,255,.8)'>"+_an+"</div>":"")
+        +"</div>";
+    }).join("");
+    var _eBlocks=_evS.map(function(e){var _y=ty(e.time);if(_y<0)return"";return "<div style='position:absolute;top:"+_y+"px;height:26px;left:2px;right:2px;background:#8b5cf6;border-radius:5px;padding:3px 7px;overflow:hidden;z-index:2'><div style='font-size:.65rem;font-weight:600;color:#fff'>"+e.title+"</div></div>";}).join("");
+    return nav+tabs+_allDay
+      +"<div style='display:flex;overflow-y:auto;max-height:calc(100vh - 305px)'>"
+      +"<div style='width:44px;flex-shrink:0;position:relative;height:"+gridH+"px'>"+tlbls+"</div>"
+      +"<div style='flex:1;position:relative;height:"+gridH+"px'>"+hgrid(true)+_dBlocks+_eBlocks+"</div>"
+      +"</div>";
+  }
+  var DNS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],wCols="";
+  for(var wi=0;wi<7;wi++){
+    var wDate=days[wi],wDj=fj(wDate),wDe=fe(wDate),isT=wDate===today,wDN=parseInt(wDate.slice(8));
+    var wDots=wDj.filter(function(j){return !j.startTime;}).map(function(j){return "<div style='width:5px;height:5px;border-radius:50%;background:"+jcol(j)+"' title='"+j.address+"'></div>";}).join("");
+    var wBlk=wDj.filter(function(j){return j.startTime;}).map(function(j){var _y=ty(j.startTime);if(_y<0)return"";var _hp=Math.max(tdur(j.startTime,j.endTime)*ROWH,20);return "<div style='position:absolute;top:"+_y+"px;height:"+_hp+"px;left:1px;right:1px;background:"+jcol(j)+";border-radius:4px;padding:2px 3px;overflow:hidden;cursor:pointer;z-index:2' onclick='pcCalJob(this)' data-id='"+j.id+"'><div style='font-size:.52rem;font-weight:700;color:#fff;line-height:1.2'>"+j.address.split(",")[0]+"</div>"+(_hp>30?"<div style='font-size:.48rem;color:rgba(255,255,255,.85)'>"+j.startTime+"</div>":"")+"</div>";}).join("");
+    var wEvBlk=wDe.filter(function(e){return e.time;}).map(function(e){var _y=ty(e.time);if(_y<0)return"";return "<div style='position:absolute;top:"+_y+"px;height:18px;left:1px;right:1px;background:#8b5cf6;border-radius:3px;padding:2px 3px;overflow:hidden;z-index:2'><div style='font-size:.5rem;color:#fff'>"+e.title+"</div></div>";}).join("");
+    wCols+="<div style='flex:0 0 80px;border-left:1px solid var(--bdr)'>"
+      +"<div style='position:sticky;top:0;text-align:center;padding:.3rem .1rem;border-bottom:1px solid var(--bdr);background:var(--surface);z-index:4'>"
+      +"<div style='font-size:.57rem;color:var(--muted);text-transform:uppercase'>"+DNS[wi]+"</div>"
+      +"<div style='width:24px;height:24px;border-radius:50%;background:"+(isT?"var(--brand)":"transparent")+";color:"+(isT?"#fff":"var(--ink)")+";display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:"+(isT?"700":"400")+";cursor:pointer;margin:0 auto' onclick='pcCalGoDay(this)' data-d='"+wDate+"'>"+wDN+"</div>"
+      +"</div>"
+      +(wDots?"<div style='display:flex;gap:2px;padding:2px 3px;flex-wrap:wrap;min-height:12px;border-bottom:1px solid var(--bdr)'>"+wDots+"</div>":"")
+      +"<div style='position:relative;height:"+gridH+"px'>"+hgrid(isT)+wBlk+wEvBlk+"</div>"
+      +"</div>";
+  }
+  return nav+tabs
+    +"<div style='display:flex;overflow:auto;max-height:calc(100vh - 250px)'>"
+    +"<div style='position:sticky;left:0;z-index:3;background:var(--surface);flex-shrink:0;width:42px'>"
+    +"<div style='position:sticky;top:0;height:46px;border-bottom:1px solid var(--bdr);background:var(--surface);z-index:5'></div>"
+    +"<div style='position:relative;height:"+gridH+"px'>"+tlbls+"</div>"
+    +"</div>"
+    +"<div style='display:flex;flex:1;min-width:560px'>"+wCols+"</div>"
+    +"</div>";
 }
 function selectCalDay(d){calSelectedDate=d;showAddEvent=false;render();}
-function calPrev(){var d=new Date(calViewDate+"T12:00:00");d.setMonth(d.getMonth()-1);calViewDate=d.toISOString().slice(0,10);render();}
-function calNext(){var d=new Date(calViewDate+"T12:00:00");d.setMonth(d.getMonth()+1);calViewDate=d.toISOString().slice(0,10);render();}
+function calGcPrev(){var d=new Date(calViewDate+"T12:00:00");if(calView==="day")d.setDate(d.getDate()-1);else d.setDate(d.getDate()-7);calViewDate=d.toISOString().slice(0,10);render();}
+function calGcNext(){var d=new Date(calViewDate+"T12:00:00");if(calView==="day")d.setDate(d.getDate()+1);else d.setDate(d.getDate()+7);calViewDate=d.toISOString().slice(0,10);render();}
+function calGcToday(){calViewDate=td();render();}
 function addEvent(){var title=document.getElementById("ev-title").value.trim();if(!title){alert("Enter a title.");return;}var sel=document.getElementById("ev-assign");var assigned=Array.from(sel.selectedOptions).map(function(o){return o.value;});events.push({id:"ev"+Date.now(),date:calSelectedDate,title:title,time:document.getElementById("ev-time").value,type:document.getElementById("ev-type").value,assignedTo:assigned});save();showAddEvent=false;render();}
 function delEvent(id){if(!confirm("Delete event?"))return;events=events.filter(function(e){return e.id!==id;});save();render();}
 
@@ -1058,6 +1134,10 @@ function pcSetExpTab(el){expTab=el.dataset.v;render();}
 function pcSetFinPeriod(el){finPeriod=el.dataset.v;render();}
 function pcSetFinView(el){finView=el.dataset.v;render();}
 function pcSetPayPeriod(el){payPeriod=el.dataset.v;render();}
+function pcSetCalView(el){calView=el.dataset.v;render();}
+function pcCalEmp(el){calEmployee=el.dataset.v;render();}
+function pcCalGoDay(el){calView="day";calViewDate=el.dataset.d;render();}
+function pcCalJob(el){var id=el.dataset.id;var j=jobs.find(function(j){return j.id===id;});if(!j)return;toast(j.address+(j.startTime?" · "+j.startTime+(j.endTime?" – "+j.endTime:""):"")+" · "+fc(j.amount)+(j.done?" ✓":""));}
 
 /* ── INIT ── */
 seedDemo();
