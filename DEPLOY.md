@@ -70,7 +70,44 @@ Same steps, at https://render.com
 
 ---
 
-## Step 4 — Install the app on team phones
+## Step 4 — Enable cloud data sync (recommended — prevents data loss)
+
+By default the app only stores data in `localStorage` on each device. If
+the app is removed from the home screen and re-added (common on iOS), that
+local data can be wiped. Cloud sync fixes this by automatically backing up
+every change to a free Firebase database, and restoring it the moment the
+app is reopened.
+
+1. Go to https://console.firebase.google.com and create a free project
+2. In the project, go to **Build → Firestore Database → Create database**
+   (choose **Production mode**, any region)
+3. Go to **Project settings → General → Your apps → Add app → Web (`</>`)**,
+   register the app (no hosting needed), and copy the `firebaseConfig` object
+4. In `index.html`, find the `FIREBASE_CONFIG` constant near the top of the
+   `<script>` block and replace the placeholder values with your real config
+5. In Firestore, go to **Rules** and set:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /proclean_data/main {
+         allow read, write: if true;
+       }
+     }
+   }
+   ```
+   (This restricts access to a single document used by the app. Anyone with
+   your Firebase config could read/write your business data — fine for a
+   small private team app, but don't share the config publicly.)
+6. Re-upload `index.html` to Netlify
+
+Once configured, every job, customer, payment, etc. is synced automatically.
+Reinstalling the app, switching devices, or clearing site data will pull
+the latest data back down from the cloud on next launch.
+
+---
+
+## Step 5 — Install the app on team phones
 
 ### iPhone / iPad (iOS 16.4+)
 1. Open Safari and go to your Netlify URL
@@ -112,10 +149,16 @@ Same steps, at https://render.com
 
 ## Data & privacy
 
-- All business data is stored in `localStorage` on each device
-- For shared real-time data across all team phones, you would add a
-  backend database (Supabase free tier works well — ask for the sync upgrade)
-- No data is sent to any third party
+- Business data is cached in `localStorage` on each device for instant,
+  offline-first access
+- If cloud sync is configured (Step 4), every change is also backed up to
+  your private Firebase project and restored automatically on any device
+  that opens the app — this is what protects you from losing data if the
+  app is deleted and reinstalled
+- Without cloud sync configured, data lives only in `localStorage` and can
+  be lost if the app/site data is cleared or the home screen icon is
+  removed and re-added
+- No data is sent to any third party other than your own Firebase project
 
 ---
 

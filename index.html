@@ -261,9 +261,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <div id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 const OWNER_CODE="pro2024";
 const VAPID_KEY="YOUR_VAPID_PUBLIC_KEY_HERE";
+/* Cloud sync: replace with your Firebase project config (see DEPLOY.md). Safe to commit — these are public client identifiers, not secrets. */
+const FIREBASE_CONFIG={apiKey:"YOUR_FIREBASE_API_KEY",authDomain:"YOUR_PROJECT.firebaseapp.com",projectId:"YOUR_PROJECT",storageBucket:"YOUR_PROJECT.appspot.com",messagingSenderId:"YOUR_SENDER_ID",appId:"YOUR_APP_ID"};
+var db=null,dbReady=false;
+try{
+  if(FIREBASE_CONFIG.apiKey!=="YOUR_FIREBASE_API_KEY"&&typeof firebase!=="undefined"){
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db=firebase.firestore();
+    try{db.enablePersistence({synchronizeTabs:true});}catch(e){}
+    dbReady=true;
+  }
+}catch(e){dbReady=false;}
 function J(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 var users=J("pc_users",[]),jobs=J("pc_jobs",[]),expenses=J("pc_expenses",[]);
 var bizBills=J("pc_biz",[]),events=J("pc_events",[]),timesheets=J("pc_ts",[]);
@@ -277,7 +290,34 @@ var mktLoading=false,mktGenerating=false,mktAdsData=[],mktDrafts=[],mktTab="gene
 var finPeriod="month",finView="period",finYear=new Date().getFullYear(),finMonth=new Date().getMonth();
 var swReg=null,deferredInstall=null;
 
-function save(){var k={pc_users:users,pc_jobs:jobs,pc_expenses:expenses,pc_biz:bizBills,pc_events:events,pc_ts:timesheets,pc_rates:hourlyRates,pc_customers:customers,pc_bio:biometricUsers,pc_fin:finSettings};Object.entries(k).forEach(function(e){localStorage.setItem(e[0],JSON.stringify(e[1]));});}
+function save(){var k={pc_users:users,pc_jobs:jobs,pc_expenses:expenses,pc_biz:bizBills,pc_events:events,pc_ts:timesheets,pc_rates:hourlyRates,pc_customers:customers,pc_bio:biometricUsers,pc_fin:finSettings};Object.entries(k).forEach(function(e){localStorage.setItem(e[0],JSON.stringify(e[1]));});cloudSync();}
+var cloudSyncTimer=null;
+function cloudSync(){
+  if(!dbReady)return;
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer=setTimeout(function(){
+    db.collection("proclean_data").doc("main").set({users:users,jobs:jobs,expenses:expenses,bizBills:bizBills,events:events,timesheets:timesheets,hourlyRates:hourlyRates,customers:customers,biometricUsers:biometricUsers,finSettings:finSettings,updatedAt:Date.now()}).catch(function(e){console.warn("Cloud sync failed:",e.message);});
+  },600);
+}
+async function cloudInit(){
+  if(dbReady){
+    try{
+      var snap=await db.collection("proclean_data").doc("main").get();
+      if(snap.exists){
+        var d=snap.data();
+        users=d.users||users;jobs=d.jobs||jobs;expenses=d.expenses||expenses;bizBills=d.bizBills||bizBills;
+        events=d.events||events;timesheets=d.timesheets||timesheets;hourlyRates=d.hourlyRates||hourlyRates;
+        customers=d.customers||customers;biometricUsers=d.biometricUsers||biometricUsers;finSettings=d.finSettings||finSettings;
+        var k={pc_users:users,pc_jobs:jobs,pc_expenses:expenses,pc_biz:bizBills,pc_events:events,pc_ts:timesheets,pc_rates:hourlyRates,pc_customers:customers,pc_bio:biometricUsers,pc_fin:finSettings};
+        Object.entries(k).forEach(function(e){localStorage.setItem(e[0],JSON.stringify(e[1]));});
+      }
+    }catch(e){console.warn("Cloud load failed, using local data:",e.message);}
+  }
+  seedDemo();
+  populateUserSelect();
+  registerSW();
+  runSplash();
+}
 function td(){return new Date().toISOString().slice(0,10);}
 function fc(n){return "\u20ac"+parseFloat(n||0).toFixed(2);}
 function fmtDate(d){return new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});}
@@ -1208,10 +1248,7 @@ function pcCalGoDay(el){calView="day";calViewDate=el.dataset.d;render();}
 function pcCalJob(el){var id=el.dataset.id;var j=jobs.find(function(j){return j.id===id;});if(!j)return;toast(j.address+(j.startTime?" · "+j.startTime+(j.endTime?" – "+j.endTime:""):"")+" · "+fc(j.amount)+(j.done?" ✓":""));}
 
 /* ── INIT ── */
-seedDemo();
-populateUserSelect();
-registerSW();
-runSplash();
+cloudInit();
 </script>
 </body>
 </html>
