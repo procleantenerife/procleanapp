@@ -61,12 +61,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .topbar-right{display:flex;align-items:center;gap:.5rem}
 .topbar-user{font-size:.78rem;opacity:.85}
 .topbar-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:.32rem .55rem;border-radius:6px;cursor:pointer;font-size:.78rem;display:flex;align-items:center;gap:3px;min-height:34px}
+.menu-btn{background:rgba(255,255,255,.2);border:none;color:#fff;width:34px;height:34px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.05rem;margin-right:.7rem;flex-shrink:0}
 #page-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1.1rem;padding-bottom:calc(1.1rem + var(--safe-bot))}
 .inner{max-width:480px;margin:0 auto}
-.bottom-nav{background:var(--card);border-top:1px solid var(--bdr);display:flex;flex-shrink:0;padding-bottom:var(--safe-bot)}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;padding:.5rem .05rem .4rem;gap:2px;background:none;border:none;cursor:pointer;color:var(--ink3);font-size:.52rem;font-weight:500;min-height:52px}
-.nav-btn.active{color:var(--brand)}
-.nav-btn i{font-size:1.2rem}
+#app-launcher{position:fixed;inset:0;background:rgba(8,20,38,.6);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);z-index:900;display:none;flex-direction:column}
+#app-launcher.open{display:flex}
+.launcher-hdr{display:flex;align-items:center;justify-content:space-between;padding:calc(1.1rem + var(--safe-top)) 1.2rem .8rem}
+.launcher-title{font-family:var(--font-head);font-size:1.05rem;color:#fff}
+.launcher-close{background:rgba(255,255,255,.18);border:none;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;flex-shrink:0}
+.launcher-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.3rem .7rem;padding:.3rem 1.2rem 1.5rem;overflow-y:auto}
+.launcher-app{display:flex;flex-direction:column;align-items:center;gap:.4rem;cursor:pointer;background:none;border:none;padding:0}
+.launcher-icon{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.55rem;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.3)}
+.launcher-app.active .launcher-icon{box-shadow:0 0 0 2.5px #fff,0 4px 10px rgba(0,0,0,.3)}
+.launcher-label{font-size:.68rem;color:#fff;font-weight:500;text-align:center;line-height:1.2}
 .card{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);padding:1rem;margin-bottom:.8rem}
 .card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem}
 .card-title{font-family:var(--font-head);font-size:.9rem;font-weight:400;color:var(--ink)}
@@ -163,7 +170,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .ai-thinking{display:flex;align-items:center;gap:.5rem;padding:.75rem;background:var(--teal-l);border-radius:var(--rsm);margin-bottom:.5rem;font-size:.8rem;color:var(--teal-d)}
 .spinner{width:16px;height:16px;border:2px solid var(--teal);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
-#toast{position:fixed;bottom:calc(80px + var(--safe-bot));left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:.6rem 1.1rem;border-radius:20px;font-size:.82rem;font-weight:500;opacity:0;transition:all .3s;z-index:500;white-space:nowrap;pointer-events:none}
+#toast{position:fixed;bottom:calc(20px + var(--safe-bot));left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:.6rem 1.1rem;border-radius:20px;font-size:.82rem;font-weight:500;opacity:0;transition:all .3s;z-index:500;white-space:nowrap;pointer-events:none}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 /* FINANCIAL POT CARDS */
 .pot-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.85rem}
@@ -247,6 +254,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center">
+      <button class="menu-btn" onclick="openAppMenu()" aria-label="Menu"><i class="ti ti-grid-dots"></i></button>
       <span class="topbar-logo">ProClean</span>
       <span class="role-badge" id="role-badge">Employee</span>
     </div>
@@ -257,7 +265,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
   </div>
   <div id="page-content"><div class="inner"></div></div>
-  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+<div id="app-launcher" onclick="if(event.target===this)closeAppMenu()">
+  <div class="launcher-hdr">
+    <span class="launcher-title">Apps</span>
+    <button class="launcher-close" onclick="closeAppMenu()" aria-label="Close"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="launcher-grid" id="launcher-grid"></div>
 </div>
 <div id="toast"></div>
 
@@ -439,13 +453,16 @@ function startApp(){
   if(!localStorage.getItem("mktPageId"))localStorage.setItem("mktPageId","114127971781733");
   showPage("jobs");
 }
+var APP_COLORS={jobs:"linear-gradient(135deg,#0194fe,#0076d1)",calendar:"linear-gradient(135deg,#ff9f0a,#ff6b00)",customers:"linear-gradient(135deg,#bf5af2,#8e44ec)",income:"linear-gradient(135deg,#34c759,#16a34a)",expenses:"linear-gradient(135deg,#ff453a,#dc2626)",financial:"linear-gradient(135deg,#30c7c0,#0e9488)",revenue:"linear-gradient(135deg,#5e72eb,#3c4fd1)",marketing:"linear-gradient(135deg,#ff5e9c,#e0457f)",payroll:"linear-gradient(135deg,#8e8e93,#636366)"};
 function buildNav(){
   var isOwner=currentUser.role==="owner";
-  var pages=[{id:"jobs",icon:"ti-clipboard-list",label:"Jobs"},{id:"calendar",icon:"ti-calendar",label:"Cal"},{id:"customers",icon:"ti-address-book",label:"Clients"},{id:"income",icon:"ti-coin-pound",label:"Income"},{id:"expenses",icon:"ti-receipt",label:"Expenses"}];
-  if(isOwner){pages.push({id:"financial",icon:"ti-chart-pie",label:"Finance"});pages.push({id:"revenue",icon:"ti-chart-bar",label:"Revenue"});pages.push({id:"marketing",icon:"ti-speakerphone",label:"Mkt"});}
+  var pages=[{id:"jobs",icon:"ti-clipboard-list",label:"Jobs"},{id:"calendar",icon:"ti-calendar",label:"Calendar"},{id:"customers",icon:"ti-address-book",label:"Clients"},{id:"income",icon:"ti-coin-pound",label:"Income"},{id:"expenses",icon:"ti-receipt",label:"Expenses"}];
+  if(isOwner){pages.push({id:"financial",icon:"ti-chart-pie",label:"Finance"});pages.push({id:"revenue",icon:"ti-chart-bar",label:"Revenue"});pages.push({id:"marketing",icon:"ti-speakerphone",label:"Marketing"});}
   pages.push({id:"payroll",icon:"ti-clock",label:isOwner?"Payroll":"Hours"});
-  document.getElementById("bottom-nav").innerHTML=pages.map(function(p){return "<button class='nav-btn"+(currentPage===p.id?" active":"")+"' onclick='pcNav(this)' data-p='"+ p.id +"'><i class='ti "+p.icon+"'></i>"+p.label+"</button>";}).join("");
+  document.getElementById("launcher-grid").innerHTML=pages.map(function(p){return "<button class='launcher-app"+(currentPage===p.id?" active":"")+"' onclick='pcNav(this)' data-p='"+ p.id +"'><span class='launcher-icon' style='background:"+APP_COLORS[p.id]+"'><i class='ti "+p.icon+"'></i></span><span class='launcher-label'>"+p.label+"</span></button>";}).join("");
 }
+function openAppMenu(){document.getElementById("app-launcher").classList.add("open");}
+function closeAppMenu(){document.getElementById("app-launcher").classList.remove("open");}
 function showPage(p){currentPage=p;showAddJob=false;showAddExp=false;showAddBiz=false;showAddEvent=false;showAddTime=false;showAddCust=false;showFinSettings=false;jobAssignSel=[];routeResult=null;routeLoading=false;buildNav();render();}
 function render(){var c=document.querySelector("#page-content .inner");if(!c)return;if(currentPage==="jobs")c.innerHTML=renderJobs();else if(currentPage==="calendar")c.innerHTML=renderCalendar();else if(currentPage==="customers")c.innerHTML=renderCustomers();else if(currentPage==="income")c.innerHTML=renderIncome();else if(currentPage==="expenses")c.innerHTML=renderExpenses();else if(currentPage==="financial")c.innerHTML=renderFinancial();else if(currentPage==="revenue")c.innerHTML=renderRevenue();else if(currentPage==="payroll")c.innerHTML=renderPayroll();else if(currentPage==="marketing")c.innerHTML=renderMarketing();}
 function dateNav(){return "<div class='date-nav'><button onclick='changeDate(-1)'><i class='ti ti-chevron-left'></i></button><span>"+fmtDate(viewDate)+"</span><button onclick='changeDate(1)'><i class='ti ti-chevron-right'></i></button></div>";}
@@ -1250,7 +1267,7 @@ function mktPostToFB(i){
 }
 
 /* ── EVENT HELPERS (avoid inline quote escaping) ── */
-function pcNav(el){showPage(el.dataset.p);}
+function pcNav(el){showPage(el.dataset.p);closeAppMenu();}
 function pcToggleJob(el){toggleJob(el.dataset.p);}
 function pcDeleteJob(el){deleteJob(el.dataset.p);}
 function pcEditJob(el){openEditJob(el.dataset.p);}
