@@ -427,6 +427,7 @@ function renderJobs(){
       +"<div class='ff' style='margin-bottom:.55rem'><label>Assign to</label><div class='assign-grid'><span class='assign-pill team-all' onclick='assignAll()'>All team</span>"
       +users.map(function(u){return "<span class='assign-pill"+(jobAssignSel.indexOf(u.id)>=0?" selected":"")+"' onclick='pcToggleAssign(this)' data-p='"+ u.id +"' id='pill-"+u.id+"'>"+u.name.split(" ")[0]+"</span>";}).join("")+"</div></div>"
       +"<div class='frow'><div class='ff'><label>Start time</label><input id='j-start' type='time'/></div><div class='ff'><label>End time</label><input id='j-end' type='time'/></div></div>"
+      +"<div class='frow full'><div class='ff'><label>Repeat</label><select id='j-repeat'><option value='0'>Does not repeat</option><option value='2'>Every 2 weeks</option><option value='4'>Every 4 weeks</option><option value='6'>Every 6 weeks</option><option value='8'>Every 8 weeks</option></select></div></div>"
       +"<div class='frow full'><div class='ff'><label>Notes</label><input id='j-notes' placeholder='Optional'/></div></div>"
       +"<div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='addJob()'><i class='ti ti-plus'></i> Add</button><button class='btn-sm' onclick='showAddJob=false;render()'>Cancel</button></div></div>";
   }
@@ -451,7 +452,7 @@ function renderJobs(){
     else if(routeResult)routeSection="<div class='route-card'><h3><i class='ti ti-route'></i> Suggested route</h3>"+routeResult.map(function(s,i){return "<div class='route-step'><div class='route-num'>"+(i+1)+"</div><div><div class='route-addr'>"+s.address+"</div><div class='route-note'>"+s.reason+"</div></div></div>";}).join("")+"<button class='btn-sm' style='margin-top:.6rem;border-color:var(--teal);color:var(--teal)' onclick='routeResult=null;render()'><i class='ti ti-x'></i> Clear</button></div>";
     else routeSection="<div class='route-card'><h3><i class='ti ti-route'></i> AI Route Planner</h3><p style='font-size:.78rem;color:var(--teal-d);margin-bottom:.65rem'>Optimise the order of your "+myJobs.length+" jobs today.</p><button class='btn-teal' onclick='runRoute()'><i class='ti ti-sparkles'></i> Optimise route</button></div>";
   }
-  var list=myJobs.length===0?"<div class='empty'><i class='ti ti-calendar-off'></i><p>No jobs scheduled</p></div>":myJobs.map(function(j){return "<div class='item-row'><div class='circle-btn"+(j.done?" done":"")+"' onclick='pcToggleJob(this)' data-p='"+ j.id +"'>"+(j.done?"<i class='ti ti-check'></i>":"")+"</div><div class='item-info'><div class='item-title"+(j.done?" done":"")+"'>"+j.address+(j.startTime?" <span style='font-size:.7rem;color:var(--ink3);font-weight:400'>"+j.startTime+(j.endTime?" – "+j.endTime:"")+"</span>":"")+"</div><div class='item-sub'><span>"+j.type+"</span><span>"+j.assignedTo.map(uname).join(", ")+"</span>"+(j.notes?"<span>"+j.notes+"</span>":"")+"</div></div><div style='display:flex;flex-direction:column;align-items:flex-end;gap:5px'><span style='font-size:.88rem;font-weight:600;color:var(--green)'>"+fc(j.amount)+"</span>"+(j.done?"<span class='badge bg-green'>Done</span>":"<span class='badge bg-amber'>Pending</span>")+(isOwner?"<div style='display:flex;gap:4px'><button class='btn-del' style='border-color:var(--brand);color:var(--brand)' onclick='pcEditJob(this)' data-p='"+ j.id +"'><i class='ti ti-pencil' style='font-size:11px'></i></button><button class='btn-del' onclick='pcDeleteJob(this)' data-p='"+ j.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button></div>":"")+"</div></div>";}).join("");
+  var list=myJobs.length===0?"<div class='empty'><i class='ti ti-calendar-off'></i><p>No jobs scheduled</p></div>":myJobs.map(function(j){return "<div class='item-row'><div class='circle-btn"+(j.done?" done":"")+"' onclick='pcToggleJob(this)' data-p='"+ j.id +"'>"+(j.done?"<i class='ti ti-check'></i>":"")+"</div><div class='item-info'><div class='item-title"+(j.done?" done":"")+"'>"+j.address+(j.recurId?" <i class='ti ti-repeat' style='font-size:12px;color:var(--teal)' title='Repeating job'></i>":"")+(j.startTime?" <span style='font-size:.7rem;color:var(--ink3);font-weight:400'>"+j.startTime+(j.endTime?" – "+j.endTime:"")+"</span>":"")+"</div><div class='item-sub'><span>"+j.type+"</span><span>"+j.assignedTo.map(uname).join(", ")+"</span>"+(j.notes?"<span>"+j.notes+"</span>":"")+"</div></div><div style='display:flex;flex-direction:column;align-items:flex-end;gap:5px'><span style='font-size:.88rem;font-weight:600;color:var(--green)'>"+fc(j.amount)+"</span>"+(j.done?"<span class='badge bg-green'>Done</span>":"<span class='badge bg-amber'>Pending</span>")+(isOwner?"<div style='display:flex;gap:4px'><button class='btn-del' style='border-color:var(--brand);color:var(--brand)' onclick='pcEditJob(this)' data-p='"+ j.id +"'><i class='ti ti-pencil' style='font-size:11px'></i></button><button class='btn-del' onclick='pcDeleteJob(this)' data-p='"+ j.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button></div>":"")+"</div></div>";}).join("");
   var ownerBar=isOwner?"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem'><div style='display:flex;gap:.4rem'><button class='btn-sm' onclick='notifyStaff()' style='border-color:var(--brand);color:var(--brand)'><i class='ti ti-bell'></i> Notify</button><button class='btn-sm' onclick='whatsappOwner()' style='border-color:#25D366;color:#25D366'><i class='ti ti-brand-whatsapp'></i> WhatsApp</button></div><button class='btn-add' onclick='showAddJob=!showAddJob;jobAssignSel=[];render()'><i class='ti ti-plus'></i> Add job</button></div>":"<div style='display:flex;justify-content:flex-end;margin-bottom:.75rem'><button class='btn-sm' onclick='whatsappEmployee()' style='border-color:#25D366;color:#25D366'><i class='ti ti-brand-whatsapp'></i> Share my jobs</button></div>";
   return dateNav()+"<div class='stats-row'><div class='stat'><div class='stat-val'>"+done+"/"+myJobs.length+"</div><div class='stat-lbl'>Done today</div></div><div class='stat'><div class='stat-val'>"+fc(collected)+"</div><div class='stat-lbl'>Collected</div></div></div>"+ownerBar+addForm+editForm+routeSection+"<div class='card'><div class='card-hdr'><div class='card-title'>"+(isOwner?"All jobs":"My jobs")+"</div><span class='badge bg-brand'>"+myJobs.length+" total</span></div>"+list+"</div>";
 }
@@ -465,11 +466,39 @@ function addJob(){
   if(!address){alert("Select a customer or enter an address.");return;}
   if(jobAssignSel.length===0){alert("Assign to at least one person.");return;}
   var jst=document.getElementById("j-start").value,jet=document.getElementById("j-end").value;
-  var j={id:"j"+Date.now(),date:viewDate,customerId:custId!=="custom"?custId:null,address:address,type:document.getElementById("j-type").value,assignedTo:jobAssignSel.slice(),amount:parseFloat(document.getElementById("j-amt").value)||0,done:false,notes:document.getElementById("j-notes").value.trim(),startTime:jst||null,endTime:jet||null};
-  jobs.push(j);save();showAddJob=false;jobAssignSel=[];render();notifyNewJob(j);
+  var repeatWeeks=parseInt(document.getElementById("j-repeat").value)||0;
+  var baseCust=custId!=="custom"?custId:null,baseType=document.getElementById("j-type").value,baseAmt=parseFloat(document.getElementById("j-amt").value)||0,baseNotes=document.getElementById("j-notes").value.trim(),baseAssigned=jobAssignSel.slice();
+  var newJobs=[];
+  if(repeatWeeks>0){
+    var recurId="r"+Date.now();
+    var d=new Date(viewDate+"T12:00:00"),horizon=new Date(viewDate+"T12:00:00");horizon.setFullYear(horizon.getFullYear()+1);
+    var idx=0;
+    while(d<=horizon){
+      newJobs.push({id:"j"+Date.now()+"_"+idx,date:d.toISOString().slice(0,10),customerId:baseCust,address:address,type:baseType,assignedTo:baseAssigned,amount:baseAmt,done:false,notes:baseNotes,startTime:jst||null,endTime:jet||null,recurId:recurId,recurWeeks:repeatWeeks});
+      d.setDate(d.getDate()+repeatWeeks*7);
+      idx++;
+    }
+  } else {
+    newJobs.push({id:"j"+Date.now(),date:viewDate,customerId:baseCust,address:address,type:baseType,assignedTo:baseAssigned,amount:baseAmt,done:false,notes:baseNotes,startTime:jst||null,endTime:jet||null});
+  }
+  jobs=jobs.concat(newJobs);save();showAddJob=false;jobAssignSel=[];render();notifyNewJob(newJobs[0]);
+  if(newJobs.length>1)toast(newJobs.length+" jobs created, repeating every "+repeatWeeks+" weeks");
 }
 function toggleJob(id){var j=jobs.find(function(j){return j.id===id;});if(j){j.done=!j.done;save();render();if(j.done)toast("Job marked complete");}}
-function deleteJob(id){if(!confirm("Delete this job?"))return;jobs=jobs.filter(function(j){return j.id!==id;});save();render();}
+function deleteJob(id){
+  var j=jobs.find(function(j){return j.id===id;});if(!j)return;
+  if(j.recurId){
+    if(confirm("This job is part of a repeating series. Delete ALL future occurrences? (Cancel will ask to delete just this one)")){
+      jobs=jobs.filter(function(jb){return !(jb.recurId===j.recurId&&jb.date>=j.date);});
+    } else if(confirm("Delete just this one occurrence?")){
+      jobs=jobs.filter(function(jb){return jb.id!==id;});
+    } else return;
+  } else {
+    if(!confirm("Delete this job?"))return;
+    jobs=jobs.filter(function(jb){return jb.id!==id;});
+  }
+  save();render();
+}
 function openEditJob(id){editJobId=id;var j=jobs.find(function(j){return j.id===id;});editJobAssignSel=j?j.assignedTo.slice():[];showAddJob=false;render();}
 function cancelEditJob(){editJobId=null;render();}
 function pcToggleEditAssign(el){var uid=el.dataset.p;var i=editJobAssignSel.indexOf(uid);if(i>=0)editJobAssignSel.splice(i,1);else editJobAssignSel.push(uid);var p=document.getElementById("epill-"+uid);if(p)p.classList.toggle("selected",editJobAssignSel.indexOf(uid)>=0);}
