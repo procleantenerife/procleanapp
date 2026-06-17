@@ -271,6 +271,7 @@ var hourlyRates=J("pc_rates",{}),customers=J("pc_customers",[]),biometricUsers=J
 var finSettings=J("pc_fin",{taxPct:20,taxBuffer:5,equipPct:10,payrollBuffer:100,minSalary:2000,personalPct:25});
 var currentUser=null,currentPage="jobs",viewDate=td(),calViewDate=td(),calSelectedDate=td(),calView="week",calEmployee="all";
 var showAddJob=false,showAddExp=false,showAddBiz=false,showAddEvent=false,showAddTime=false,showAddCust=false,showFinSettings=false;
+var editCustId=null,editJobId=null,editJobAssignSel=[];
 var payPeriod="week",expTab="daily",jobAssignSel=[],routeResult=null,routeLoading=false;
 var mktLoading=false,mktGenerating=false,mktAdsData=[],mktDrafts=[],mktTab="generate",mktImages=[],mktAnalysis=null,mktAnalysing=false;
 var finPeriod="month",finView="period",finYear=new Date().getFullYear(),finMonth=new Date().getMonth();
@@ -429,15 +430,30 @@ function renderJobs(){
       +"<div class='frow full'><div class='ff'><label>Notes</label><input id='j-notes' placeholder='Optional'/></div></div>"
       +"<div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='addJob()'><i class='ti ti-plus'></i> Add</button><button class='btn-sm' onclick='showAddJob=false;render()'>Cancel</button></div></div>";
   }
+  var editForm="";
+  if(editJobId&&isOwner){
+    var ej=jobs.find(function(j){return j.id===editJobId;});
+    if(ej){
+      editForm="<div class='add-panel'><h3>Edit job</h3>"
+        +"<div class='frow full'><div class='ff'><label>Address</label><input id='ej-addr' value='"+ej.address.replace(/'/g,"&#39;")+"'/></div></div>"
+        +"<div class='frow'><div class='ff'><label>Date</label><input id='ej-date' type='date' value='"+ej.date+"'/></div><div class='ff'><label>Type</label><select id='ej-type'>"+["Residential","Commercial","Industrial"].map(function(t){return "<option"+(ej.type===t?" selected":"")+">"+t+"</option>";}).join("")+"</select></div></div>"
+        +"<div class='frow'><div class='ff'><label>Amount</label><input id='ej-amt' type='number' value='"+ej.amount+"' min='0' step='0.01' inputmode='decimal'/></div></div>"
+        +"<div class='ff' style='margin-bottom:.55rem'><label>Assign to</label><div class='assign-grid'><span class='assign-pill team-all' onclick='editAssignAll()'>All team</span>"
+        +users.map(function(u){return "<span class='assign-pill"+(editJobAssignSel.indexOf(u.id)>=0?" selected":"")+"' onclick='pcToggleEditAssign(this)' data-p='"+ u.id +"' id='epill-"+u.id+"'>"+u.name.split(" ")[0]+"</span>";}).join("")+"</div></div>"
+        +"<div class='frow'><div class='ff'><label>Start time</label><input id='ej-start' type='time' value='"+(ej.startTime||"")+"'/></div><div class='ff'><label>End time</label><input id='ej-end' type='time' value='"+(ej.endTime||"")+"'/></div></div>"
+        +"<div class='frow full'><div class='ff'><label>Notes</label><input id='ej-notes' value='"+(ej.notes||"").replace(/'/g,"&#39;")+"'/></div></div>"
+        +"<div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='saveJobEdit()'><i class='ti ti-check'></i> Save changes</button><button class='btn-sm' onclick='cancelEditJob()'>Cancel</button></div></div>";
+    }
+  }
   var routeSection="";
   if(isOwner&&myJobs.length>1){
     if(routeLoading)routeSection="<div class='route-card'><h3><i class='ti ti-route'></i> AI Route Planner</h3><div class='ai-thinking'><div class='spinner'></div>Optimising your route...</div></div>";
     else if(routeResult)routeSection="<div class='route-card'><h3><i class='ti ti-route'></i> Suggested route</h3>"+routeResult.map(function(s,i){return "<div class='route-step'><div class='route-num'>"+(i+1)+"</div><div><div class='route-addr'>"+s.address+"</div><div class='route-note'>"+s.reason+"</div></div></div>";}).join("")+"<button class='btn-sm' style='margin-top:.6rem;border-color:var(--teal);color:var(--teal)' onclick='routeResult=null;render()'><i class='ti ti-x'></i> Clear</button></div>";
     else routeSection="<div class='route-card'><h3><i class='ti ti-route'></i> AI Route Planner</h3><p style='font-size:.78rem;color:var(--teal-d);margin-bottom:.65rem'>Optimise the order of your "+myJobs.length+" jobs today.</p><button class='btn-teal' onclick='runRoute()'><i class='ti ti-sparkles'></i> Optimise route</button></div>";
   }
-  var list=myJobs.length===0?"<div class='empty'><i class='ti ti-calendar-off'></i><p>No jobs scheduled</p></div>":myJobs.map(function(j){return "<div class='item-row'><div class='circle-btn"+(j.done?" done":"")+"' onclick='pcToggleJob(this)' data-p='"+ j.id +"'>"+(j.done?"<i class='ti ti-check'></i>":"")+"</div><div class='item-info'><div class='item-title"+(j.done?" done":"")+"'>"+j.address+"</div><div class='item-sub'><span>"+j.type+"</span><span>"+j.assignedTo.map(uname).join(", ")+"</span>"+(j.notes?"<span>"+j.notes+"</span>":"")+"</div></div><div style='display:flex;flex-direction:column;align-items:flex-end;gap:5px'><span style='font-size:.88rem;font-weight:600;color:var(--green)'>"+fc(j.amount)+"</span>"+(j.done?"<span class='badge bg-green'>Done</span>":"<span class='badge bg-amber'>Pending</span>")+(isOwner?"<button class='btn-del' onclick='pcDeleteJob(this)' data-p='"+ j.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button>":"")+"</div></div>";}).join("");
+  var list=myJobs.length===0?"<div class='empty'><i class='ti ti-calendar-off'></i><p>No jobs scheduled</p></div>":myJobs.map(function(j){return "<div class='item-row'><div class='circle-btn"+(j.done?" done":"")+"' onclick='pcToggleJob(this)' data-p='"+ j.id +"'>"+(j.done?"<i class='ti ti-check'></i>":"")+"</div><div class='item-info'><div class='item-title"+(j.done?" done":"")+"'>"+j.address+(j.startTime?" <span style='font-size:.7rem;color:var(--ink3);font-weight:400'>"+j.startTime+(j.endTime?" – "+j.endTime:"")+"</span>":"")+"</div><div class='item-sub'><span>"+j.type+"</span><span>"+j.assignedTo.map(uname).join(", ")+"</span>"+(j.notes?"<span>"+j.notes+"</span>":"")+"</div></div><div style='display:flex;flex-direction:column;align-items:flex-end;gap:5px'><span style='font-size:.88rem;font-weight:600;color:var(--green)'>"+fc(j.amount)+"</span>"+(j.done?"<span class='badge bg-green'>Done</span>":"<span class='badge bg-amber'>Pending</span>")+(isOwner?"<div style='display:flex;gap:4px'><button class='btn-del' style='border-color:var(--brand);color:var(--brand)' onclick='pcEditJob(this)' data-p='"+ j.id +"'><i class='ti ti-pencil' style='font-size:11px'></i></button><button class='btn-del' onclick='pcDeleteJob(this)' data-p='"+ j.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button></div>":"")+"</div></div>";}).join("");
   var ownerBar=isOwner?"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem'><div style='display:flex;gap:.4rem'><button class='btn-sm' onclick='notifyStaff()' style='border-color:var(--brand);color:var(--brand)'><i class='ti ti-bell'></i> Notify</button><button class='btn-sm' onclick='whatsappOwner()' style='border-color:#25D366;color:#25D366'><i class='ti ti-brand-whatsapp'></i> WhatsApp</button></div><button class='btn-add' onclick='showAddJob=!showAddJob;jobAssignSel=[];render()'><i class='ti ti-plus'></i> Add job</button></div>":"<div style='display:flex;justify-content:flex-end;margin-bottom:.75rem'><button class='btn-sm' onclick='whatsappEmployee()' style='border-color:#25D366;color:#25D366'><i class='ti ti-brand-whatsapp'></i> Share my jobs</button></div>";
-  return dateNav()+"<div class='stats-row'><div class='stat'><div class='stat-val'>"+done+"/"+myJobs.length+"</div><div class='stat-lbl'>Done today</div></div><div class='stat'><div class='stat-val'>"+fc(collected)+"</div><div class='stat-lbl'>Collected</div></div></div>"+ownerBar+addForm+routeSection+"<div class='card'><div class='card-hdr'><div class='card-title'>"+(isOwner?"All jobs":"My jobs")+"</div><span class='badge bg-brand'>"+myJobs.length+" total</span></div>"+list+"</div>";
+  return dateNav()+"<div class='stats-row'><div class='stat'><div class='stat-val'>"+done+"/"+myJobs.length+"</div><div class='stat-lbl'>Done today</div></div><div class='stat'><div class='stat-val'>"+fc(collected)+"</div><div class='stat-lbl'>Collected</div></div></div>"+ownerBar+addForm+editForm+routeSection+"<div class='card'><div class='card-hdr'><div class='card-title'>"+(isOwner?"All jobs":"My jobs")+"</div><span class='badge bg-brand'>"+myJobs.length+" total</span></div>"+list+"</div>";
 }
 function prefillCust(id){document.getElementById("j-custom-row").style.display=id==="custom"?"":"none";if(!id||id==="custom")return;var c=customers.find(function(c){return c.id===id;});if(c&&c.type){var el=document.getElementById("j-type");if(el)el.value=c.type;}}
 function toggleAssign(uid){var i=jobAssignSel.indexOf(uid);if(i>=0)jobAssignSel.splice(i,1);else jobAssignSel.push(uid);var p=document.getElementById("pill-"+uid);if(p)p.classList.toggle("selected",jobAssignSel.indexOf(uid)>=0);}
@@ -454,6 +470,17 @@ function addJob(){
 }
 function toggleJob(id){var j=jobs.find(function(j){return j.id===id;});if(j){j.done=!j.done;save();render();if(j.done)toast("Job marked complete");}}
 function deleteJob(id){if(!confirm("Delete this job?"))return;jobs=jobs.filter(function(j){return j.id!==id;});save();render();}
+function openEditJob(id){editJobId=id;var j=jobs.find(function(j){return j.id===id;});editJobAssignSel=j?j.assignedTo.slice():[];showAddJob=false;render();}
+function cancelEditJob(){editJobId=null;render();}
+function pcToggleEditAssign(el){var uid=el.dataset.p;var i=editJobAssignSel.indexOf(uid);if(i>=0)editJobAssignSel.splice(i,1);else editJobAssignSel.push(uid);var p=document.getElementById("epill-"+uid);if(p)p.classList.toggle("selected",editJobAssignSel.indexOf(uid)>=0);}
+function editAssignAll(){editJobAssignSel=users.map(function(u){return u.id;});users.forEach(function(u){var p=document.getElementById("epill-"+u.id);if(p)p.classList.add("selected");});}
+function saveJobEdit(){
+  var j=jobs.find(function(j){return j.id===editJobId;});if(!j)return;
+  var addr=document.getElementById("ej-addr").value.trim();if(!addr){alert("Address required.");return;}
+  if(editJobAssignSel.length===0){alert("Assign to at least one person.");return;}
+  j.address=addr;j.date=document.getElementById("ej-date").value||j.date;j.type=document.getElementById("ej-type").value;j.amount=parseFloat(document.getElementById("ej-amt").value)||0;j.assignedTo=editJobAssignSel.slice();j.startTime=document.getElementById("ej-start").value||null;j.endTime=document.getElementById("ej-end").value||null;j.notes=document.getElementById("ej-notes").value.trim();
+  save();editJobId=null;render();toast("Job updated");
+}
 function notifyNewJob(j){if(!swReg||Notification.permission!=="granted")return;try{swReg.showNotification("ProClean - Job assigned",{body:j.address+" - "+fc(j.amount),icon:"/icons/icon-192.png",tag:"job-"+j.id,requireInteraction:true,actions:[{action:"done",title:"Mark complete"},{action:"open",title:"Open app"}],data:{jobId:j.id}});}catch(e){}}
 function notifyStaff(){var pj=jobs.filter(function(j){return j.date===viewDate&&!j.done;});if(!pj.length){toast("No pending jobs.");return;}if(!swReg||Notification.permission!=="granted"){toast("Enable notifications first.");return;}pj.forEach(function(j){notifyNewJob(j);});toast("Notified staff about "+pj.length+" jobs");}
 
@@ -608,12 +635,26 @@ function renderCustomers(){
   var isOwner=currentUser.role==="owner";
   var addForm="";
   if(showAddCust&&isOwner){addForm="<div class='add-panel'><h3>New customer</h3><div class='frow full'><div class='ff'><label>Name</label><input id='cu-name' placeholder='Customer or business name'/></div></div><div class='frow full'><div class='ff'><label>Address</label><input id='cu-addr' placeholder='Full address'/></div></div><div class='frow'><div class='ff'><label>Type</label><select id='cu-type'><option>Residential</option><option>Commercial</option><option>Industrial</option></select></div><div class='ff'><label>Phone</label><input id='cu-phone' placeholder='Optional' inputmode='tel'/></div></div><div class='frow full'><div class='ff'><label>Notes</label><input id='cu-notes' placeholder='e.g. Fortnightly, front only'/></div></div><div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='addCust()'>Save customer</button><button class='btn-sm' onclick='showAddCust=false;render()'>Cancel</button></div></div>";}
+  var editForm="";
+  if(editCustId&&isOwner){
+    var ec=customers.find(function(c){return c.id===editCustId;});
+    if(ec){editForm="<div class='add-panel'><h3>Edit customer</h3><div class='frow full'><div class='ff'><label>Name</label><input id='ec-name' value='"+ec.name.replace(/'/g,"&#39;")+"'/></div></div><div class='frow full'><div class='ff'><label>Address</label><input id='ec-addr' value='"+ec.address.replace(/'/g,"&#39;")+"'/></div></div><div class='frow'><div class='ff'><label>Type</label><select id='ec-type'>"+["Residential","Commercial","Industrial"].map(function(t){return "<option"+(ec.type===t?" selected":"")+">"+t+"</option>";}).join("")+"</select></div><div class='ff'><label>Phone</label><input id='ec-phone' value='"+(ec.phone||"").replace(/'/g,"&#39;")+"' inputmode='tel'/></div></div><div class='frow full'><div class='ff'><label>Notes</label><input id='ec-notes' value='"+(ec.notes||"").replace(/'/g,"&#39;")+"'/></div></div><div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='saveCustEdit()'><i class='ti ti-check'></i> Save changes</button><button class='btn-sm' onclick='cancelEditCust()'>Cancel</button></div></div>";}
+  }
   var tColors={Residential:"bg-brand",Commercial:"bg-amber",Industrial:"bg-purple"};
-  var list=customers.length===0?"<div class='empty'><i class='ti ti-address-book'></i><p>No customers yet</p></div>":customers.map(function(c){var cj=jobs.filter(function(j){return j.customerId===c.id;});var rev=cj.reduce(function(s,j){return s+Number(j.amount);},0);return "<div class='cust-card'><div class='cust-avatar'>"+initials(c.name)+"</div><div class='item-info'><div class='item-title'>"+c.name+"</div><div class='item-sub'><span>"+c.address+"</span></div><div style='margin-top:4px;display:flex;gap:.35rem;flex-wrap:wrap'><span class='badge "+(tColors[c.type]||"bg-gray")+"'>"+c.type+"</span>"+(c.phone?"<span style='font-size:.7rem;color:var(--ink3)'>"+c.phone+"</span>":"")+"</div>"+(c.notes?"<div style='font-size:.71rem;color:var(--ink2);margin-top:3px'>"+c.notes+"</div>":"")+"</div><div style='display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0'><span style='font-size:.8rem;font-weight:600;color:var(--green)'>"+fc(rev)+"</span><span style='font-size:.68rem;color:var(--ink3)'>"+cj.length+" job"+(cj.length!==1?"s":"")+"</span>"+(isOwner?"<button class='btn-del' onclick='pcDelCust(this)' data-p='"+ c.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button>":"")+"</div></div>";}).join("");
-  return "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem'><div style='font-family:var(--font-head);font-size:.9rem'>"+customers.length+" customer"+(customers.length!==1?"s":"")+"</div>"+(isOwner?"<button class='btn-add' onclick='showAddCust=!showAddCust;render()'><i class='ti ti-plus'></i> Add customer</button>":"")+"</div>"+addForm+"<div class='card'>"+list+"</div>";
+  var list=customers.length===0?"<div class='empty'><i class='ti ti-address-book'></i><p>No customers yet</p></div>":customers.map(function(c){var cj=jobs.filter(function(j){return j.customerId===c.id;});var rev=cj.reduce(function(s,j){return s+Number(j.amount);},0);return "<div class='cust-card'><div class='cust-avatar'>"+initials(c.name)+"</div><div class='item-info'><div class='item-title'>"+c.name+"</div><div class='item-sub'><span>"+c.address+"</span></div><div style='margin-top:4px;display:flex;gap:.35rem;flex-wrap:wrap'><span class='badge "+(tColors[c.type]||"bg-gray")+"'>"+c.type+"</span>"+(c.phone?"<span style='font-size:.7rem;color:var(--ink3)'>"+c.phone+"</span>":"")+"</div>"+(c.notes?"<div style='font-size:.71rem;color:var(--ink2);margin-top:3px'>"+c.notes+"</div>":"")+"</div><div style='display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0'><span style='font-size:.8rem;font-weight:600;color:var(--green)'>"+fc(rev)+"</span><span style='font-size:.68rem;color:var(--ink3)'>"+cj.length+" job"+(cj.length!==1?"s":"")+"</span>"+(isOwner?"<div style='display:flex;gap:4px'><button class='btn-del' style='border-color:var(--brand);color:var(--brand)' onclick='pcEditCust(this)' data-p='"+ c.id +"'><i class='ti ti-pencil' style='font-size:11px'></i></button><button class='btn-del' onclick='pcDelCust(this)' data-p='"+ c.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button></div>":"")+"</div></div>";}).join("");
+  return "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem'><div style='font-family:var(--font-head);font-size:.9rem'>"+customers.length+" customer"+(customers.length!==1?"s":"")+"</div>"+(isOwner?"<button class='btn-add' onclick='showAddCust=!showAddCust;editCustId=null;render()'><i class='ti ti-plus'></i> Add customer</button>":"")+"</div>"+addForm+editForm+"<div class='card'>"+list+"</div>";
 }
 function addCust(){var name=document.getElementById("cu-name").value.trim(),addr=document.getElementById("cu-addr").value.trim();if(!name||!addr){alert("Name and address required.");return;}customers.push({id:"c"+Date.now(),name:name,address:addr,type:document.getElementById("cu-type").value,phone:document.getElementById("cu-phone").value.trim(),notes:document.getElementById("cu-notes").value.trim()});save();showAddCust=false;render();}
+function cancelEditCust(){editCustId=null;render();}
+function saveCustEdit(){
+  var c=customers.find(function(c){return c.id===editCustId;});if(!c)return;
+  var name=document.getElementById("ec-name").value.trim(),addr=document.getElementById("ec-addr").value.trim();
+  if(!name||!addr){alert("Name and address required.");return;}
+  c.name=name;c.address=addr;c.type=document.getElementById("ec-type").value;c.phone=document.getElementById("ec-phone").value.trim();c.notes=document.getElementById("ec-notes").value.trim();
+  save();editCustId=null;render();toast("Customer updated");
+}
 function deleteCust(id){if(!confirm("Delete customer?"))return;customers=customers.filter(function(c){return c.id!==id;});save();render();}
+function openEditCust(id){editCustId=id;showAddCust=false;render();}
 
 /* ── INCOME ── */
 function renderIncome(){
@@ -1116,10 +1157,12 @@ function mktPostToFB(i){
 function pcNav(el){showPage(el.dataset.p);}
 function pcToggleJob(el){toggleJob(el.dataset.p);}
 function pcDeleteJob(el){deleteJob(el.dataset.p);}
+function pcEditJob(el){openEditJob(el.dataset.p);}
 function pcToggleAssign(el){toggleAssign(el.dataset.p);}
 function pcCalDay(el){selectCalDay(el.dataset.p);}
 function pcDelEvent(el){delEvent(el.dataset.p);}
 function pcDelCust(el){deleteCust(el.dataset.p);}
+function pcEditCust(el){openEditCust(el.dataset.p);}
 function pcDelExp(el){deleteExp(el.dataset.p);}
 function pcDelBiz(el){deleteBiz(el.dataset.p);}
 function pcUpdateRate(el){updateRate(el.dataset.p,el.value);}
