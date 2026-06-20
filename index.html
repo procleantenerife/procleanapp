@@ -297,7 +297,7 @@ var bizBills=J("pc_biz",[]),events=J("pc_events",[]),timesheets=J("pc_ts",[]);
 var hourlyRates=J("pc_rates",{}),customers=J("pc_customers",[]),biometricUsers=J("pc_bio",{});
 var finSettings=J("pc_fin",{taxPct:20,taxBuffer:5,equipPct:10,payrollBuffer:100,minSalary:2000,personalPct:25});
 var currentUser=null,currentPage="jobs",viewDate=td(),calViewDate=td(),calSelectedDate=td(),calView="week",calEmployee="all";
-var showAddJob=false,showAddExp=false,showAddBiz=false,showAddEvent=false,showAddTime=false,showAddCust=false,showFinSettings=false;
+var showAddJob=false,showAddExp=false,showAddBiz=false,showAddEvent=false,showAddTime=false,showAddCust=false,showImportCust=false,showFinSettings=false;
 var editCustId=null,editJobId=null,editJobAssignSel=[];
 var payPeriod="week",expTab="daily",jobAssignSel=[],routeResult=null,routeLoading=false;
 var mktLoading=false,mktGenerating=false,mktAdsData=[],mktDrafts=[],mktTab="generate",mktImages=[],mktAnalysis=null,mktAnalysing=false;
@@ -463,7 +463,7 @@ function buildNav(){
 }
 function openAppMenu(){document.getElementById("app-launcher").classList.add("open");}
 function closeAppMenu(){document.getElementById("app-launcher").classList.remove("open");}
-function showPage(p){currentPage=p;showAddJob=false;showAddExp=false;showAddBiz=false;showAddEvent=false;showAddTime=false;showAddCust=false;showFinSettings=false;jobAssignSel=[];routeResult=null;routeLoading=false;buildNav();render();}
+function showPage(p){currentPage=p;showAddJob=false;showAddExp=false;showAddBiz=false;showAddEvent=false;showAddTime=false;showAddCust=false;showImportCust=false;showFinSettings=false;jobAssignSel=[];routeResult=null;routeLoading=false;buildNav();render();}
 function render(){var c=document.querySelector("#page-content .inner");if(!c)return;if(currentPage==="jobs")c.innerHTML=renderJobs();else if(currentPage==="calendar")c.innerHTML=renderCalendar();else if(currentPage==="customers")c.innerHTML=renderCustomers();else if(currentPage==="income")c.innerHTML=renderIncome();else if(currentPage==="expenses")c.innerHTML=renderExpenses();else if(currentPage==="financial")c.innerHTML=renderFinancial();else if(currentPage==="revenue")c.innerHTML=renderRevenue();else if(currentPage==="payroll")c.innerHTML=renderPayroll();else if(currentPage==="marketing")c.innerHTML=renderMarketing();}
 function dateNav(){return "<div class='date-nav'><button onclick='changeDate(-1)'><i class='ti ti-chevron-left'></i></button><span>"+fmtDate(viewDate)+"</span><button onclick='changeDate(1)'><i class='ti ti-chevron-right'></i></button></div>";}
 function changeDate(n){var d=new Date(viewDate+"T12:00:00");d.setDate(d.getDate()+n);viewDate=d.toISOString().slice(0,10);routeResult=null;render();}
@@ -721,6 +721,8 @@ function renderCustomers(){
   var isOwner=currentUser.role==="owner";
   var addForm="";
   if(showAddCust&&isOwner){addForm="<div class='add-panel'><h3>New customer</h3><div class='frow full'><div class='ff'><label>Name</label><input id='cu-name' placeholder='Customer or business name'/></div></div><div class='frow full'><div class='ff'><label>Address</label><input id='cu-addr' placeholder='Full address'/></div></div><div class='frow'><div class='ff'><label>Type</label><select id='cu-type'><option>Residential</option><option>Commercial</option><option>Industrial</option></select></div><div class='ff'><label>Phone</label><input id='cu-phone' placeholder='Optional' inputmode='tel'/></div></div><div class='frow full'><div class='ff'><label>Notes</label><input id='cu-notes' placeholder='e.g. Fortnightly, front only'/></div></div><div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='addCust()'>Save customer</button><button class='btn-sm' onclick='showAddCust=false;render()'>Cancel</button></div></div>";}
+  var importForm="";
+  if(showImportCust&&isOwner){importForm="<div class='add-panel'><h3>Import customers</h3><p style='font-size:.78rem;color:var(--ink2);margin:0 0 .6rem'>Upload a CSV file or paste rows below. Columns: <b>Name, Address, Type, Phone, Notes</b> (Type and Phone and Notes are optional; Type defaults to Residential). A header row is fine.</p><div style='margin-bottom:.6rem'><input type='file' id='cust-csv-file' accept='.csv,text/csv,text/plain' onchange='importCustFile(this)'/></div><div class='ff'><textarea id='cust-csv-text' rows='6' placeholder='Mrs. Patterson, 14 Harbour Rd, Residential, 622 111 000, Fortnightly' style='width:100%;padding:.6rem .7rem;border:1.5px solid var(--bdr);border-radius:var(--rsm);font-size:.8rem;font-family:inherit;resize:vertical'></textarea></div><div style='display:flex;gap:.5rem;margin-top:.5rem'><button class='btn-add' onclick='importCustCSV()'><i class='ti ti-upload'></i> Import</button><button class='btn-sm' onclick='showImportCust=false;render()'>Cancel</button></div></div>";}
   var editForm="";
   if(editCustId&&isOwner){
     var ec=customers.find(function(c){return c.id===editCustId;});
@@ -728,7 +730,43 @@ function renderCustomers(){
   }
   var tColors={Residential:"bg-brand",Commercial:"bg-amber",Industrial:"bg-purple"};
   var list=customers.length===0?"<div class='empty'><i class='ti ti-address-book'></i><p>No customers yet</p></div>":customers.map(function(c){var cj=jobs.filter(function(j){return j.customerId===c.id;});var rev=cj.reduce(function(s,j){return s+Number(j.amount);},0);return "<div class='cust-card'><div class='cust-avatar'>"+initials(c.name)+"</div><div class='item-info'><div class='item-title'>"+c.name+"</div><div class='item-sub'><span>"+c.address+"</span></div><div style='margin-top:4px;display:flex;gap:.35rem;flex-wrap:wrap'><span class='badge "+(tColors[c.type]||"bg-gray")+"'>"+c.type+"</span>"+(c.phone?"<span style='font-size:.7rem;color:var(--ink3)'>"+c.phone+"</span>":"")+"</div>"+(c.notes?"<div style='font-size:.71rem;color:var(--ink2);margin-top:3px'>"+c.notes+"</div>":"")+"</div><div style='display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0'><span style='font-size:.8rem;font-weight:600;color:var(--green)'>"+fc(rev)+"</span><span style='font-size:.68rem;color:var(--ink3)'>"+cj.length+" job"+(cj.length!==1?"s":"")+"</span>"+(isOwner?"<div style='display:flex;gap:4px'><button class='btn-del' style='border-color:var(--brand);color:var(--brand)' onclick='pcEditCust(this)' data-p='"+ c.id +"'><i class='ti ti-pencil' style='font-size:11px'></i></button><button class='btn-del' onclick='pcDelCust(this)' data-p='"+ c.id +"'><i class='ti ti-trash' style='font-size:11px'></i></button></div>":"")+"</div></div>";}).join("");
-  return "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem'><div style='font-family:var(--font-head);font-size:.9rem'>"+customers.length+" customer"+(customers.length!==1?"s":"")+"</div>"+(isOwner?"<button class='btn-add' onclick='showAddCust=!showAddCust;editCustId=null;render()'><i class='ti ti-plus'></i> Add customer</button>":"")+"</div>"+addForm+editForm+"<div class='card'>"+list+"</div>";
+  return "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem'><div style='font-family:var(--font-head);font-size:.9rem'>"+customers.length+" customer"+(customers.length!==1?"s":"")+"</div>"+(isOwner?"<div style='display:flex;gap:.5rem'><button class='btn-sm' onclick='showImportCust=!showImportCust;showAddCust=false;editCustId=null;render()'><i class='ti ti-file-import'></i> Import CSV</button><button class='btn-add' onclick='showAddCust=!showAddCust;showImportCust=false;editCustId=null;render()'><i class='ti ti-plus'></i> Add customer</button></div>":"")+"</div>"+importForm+addForm+editForm+"<div class='card'>"+list+"</div>";
+}
+function parseCustCSV(text){
+  return text.split(/\r\n|\n|\r/).filter(function(l){return l.trim()!=="";}).map(function(line){
+    var result=[],cur="",inQ=false;
+    for(var i=0;i<line.length;i++){
+      var ch=line[i];
+      if(inQ){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++;}else{inQ=false;}}else cur+=ch;}
+      else{if(ch===","){result.push(cur);cur="";}else if(ch==='"'){inQ=true;}else cur+=ch;}
+    }
+    result.push(cur);
+    return result.map(function(s){return s.trim();});
+  });
+}
+function importCustFile(input){
+  var f=input.files&&input.files[0];if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(e){document.getElementById("cust-csv-text").value=e.target.result;};
+  reader.readAsText(f);
+}
+function importCustCSV(){
+  var text=document.getElementById("cust-csv-text").value;
+  if(!text.trim()){alert("Upload a file or paste CSV data first.");return;}
+  var rows=parseCustCSV(text);
+  if(rows[0]&&rows[0][0]&&rows[0][0].toLowerCase()==="name")rows.shift();
+  var validTypes=["Residential","Commercial","Industrial"],added=0,skipped=0,base=Date.now();
+  rows.forEach(function(r,idx){
+    var name=(r[0]||"").trim(),address=(r[1]||"").trim();
+    if(!name||!address){skipped++;return;}
+    var type=(r[2]||"").trim();
+    if(validTypes.indexOf(type)===-1)type="Residential";
+    customers.push({id:"c"+(base+idx),name:name,address:address,type:type,phone:(r[3]||"").trim(),notes:(r[4]||"").trim()});
+    added++;
+  });
+  if(added===0){alert("No valid rows found. Make sure each row has at least a name and address.");return;}
+  save();showImportCust=false;render();
+  toast(added+" customer"+(added!==1?"s":"")+" imported"+(skipped?", "+skipped+" skipped":""));
 }
 function addCust(){var name=document.getElementById("cu-name").value.trim(),addr=document.getElementById("cu-addr").value.trim();if(!name||!addr){alert("Name and address required.");return;}customers.push({id:"c"+Date.now(),name:name,address:addr,type:document.getElementById("cu-type").value,phone:document.getElementById("cu-phone").value.trim(),notes:document.getElementById("cu-notes").value.trim()});save();showAddCust=false;render();}
 function cancelEditCust(){editCustId=null;render();}
